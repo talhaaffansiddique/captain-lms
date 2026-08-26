@@ -20,7 +20,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
     const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single()
     if (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to load profile', error)
       profile.value = null
     } else {

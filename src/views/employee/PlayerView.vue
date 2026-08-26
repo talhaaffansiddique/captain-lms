@@ -55,13 +55,41 @@ async function markComplete() {
 
 <template>
   <div v-if="module_">
-    <h2 style="font-size: 20px; margin-bottom: 14px">{{ module_.title }}</h2>
-    <div v-if="embedUrl" style="aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; margin-bottom: 16px">
-      <iframe :src="embedUrl" style="width: 100%; height: 100%; border: 0" allowfullscreen />
+    <div class="topline">
+      <div>
+        <h2 style="font-size: 20px">{{ module_.title }}</h2>
+        <p>{{ module_.department }}</p>
+      </div>
     </div>
-    <button v-if="!completed" class="btn btn-primary" :disabled="saving" @click="markComplete">
-      {{ saving ? 'Saving…' : 'Mark as watched' }}
-    </button>
-    <p v-else style="color: var(--teal); font-weight: 600">✓ Completed</p>
+
+    <div class="card" style="padding: 16px; max-width: 640px">
+      <div v-if="embedUrl" class="video-box">
+        <iframe :src="embedUrl" style="width: 100%; height: 100%; border: 0" allowfullscreen />
+      </div>
+      <div v-else class="video-box video-placeholder">▶ No video attached yet</div>
+
+      <div style="margin-top: 16px; display: flex; align-items: center; gap: 12px">
+        <button v-if="!completed" class="btn btn-primary" :disabled="saving" @click="markComplete">
+          {{ saving ? 'Saving…' : 'Mark as watched' }}
+        </button>
+        <span v-else class="pill pill-teal">✓ Completed</span>
+        <RouterLink class="btn btn-ghost btn-sm" to="/app/modules">Back to modules</RouterLink>
+      </div>
+    </div>
   </div>
 </template>
+
+<style scoped>
+.video-box {
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+  background: linear-gradient(150deg, #1a1d2b, #0d0f18);
+}
+.video-placeholder {
+  display: grid;
+  place-items: center;
+  color: #cfd3e6;
+  font-size: 13px;
+}
+</style>

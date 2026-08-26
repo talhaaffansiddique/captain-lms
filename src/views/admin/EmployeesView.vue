@@ -13,21 +13,28 @@ onMounted(async () => {
 
 <template>
   <div>
-    <h2 style="font-size: 23px; margin-bottom: 16px">Employees</h2>
-    <div class="card">
-      <table style="width: 100%; border-collapse: collapse; font-size: 13.5px">
+    <div class="topline">
+      <div><h2>Employees</h2></div>
+    </div>
+    <div class="card table-wrap">
+      <table>
         <thead>
           <tr>
-            <th style="text-align: left; padding: 10px 16px; border-bottom: 1px solid var(--border)">Name</th>
-            <th style="text-align: left; padding: 10px 16px; border-bottom: 1px solid var(--border)">Department</th>
-            <th style="text-align: left; padding: 10px 16px; border-bottom: 1px solid var(--border)">Role</th>
+            <th>Name</th>
+            <th>Department</th>
+            <th>Role</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="e in employees" :key="e.id">
-            <td style="padding: 12px 16px; border-bottom: 1px solid var(--border)">{{ e.full_name }}</td>
-            <td style="padding: 12px 16px; border-bottom: 1px solid var(--border)">{{ e.department }}</td>
-            <td style="padding: 12px 16px; border-bottom: 1px solid var(--border)">{{ e.role }}</td>
+            <td style="font-weight: 600; display: flex; align-items: center; gap: 10px">
+              <div class="avatar" style="width: 26px; height: 26px; font-size: 11px">
+                {{ e.full_name.slice(0, 2).toUpperCase() }}
+              </div>
+              {{ e.full_name }}
+            </td>
+            <td>{{ e.department }}</td>
+            <td><span class="pill pill-outline">{{ e.role }}</span></td>
           </tr>
         </tbody>
       </table>

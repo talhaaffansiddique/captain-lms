@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import ThemeToggle from '@/components/ThemeToggle.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -11,47 +12,47 @@ async function logout() {
 }
 
 const links = [
-  { to: '/manager/overview', label: 'Overview' },
-  { to: '/manager/team', label: 'My Team' },
+  { to: '/manager/overview', label: 'Overview', short: 'Overview', icon: '■' },
+  { to: '/manager/team', label: 'My Team', short: 'Team', icon: '👥' },
 ]
 </script>
 
 <template>
-  <div style="display: grid; grid-template-columns: 220px 1fr; min-height: 100vh">
-    <aside style="background: #161c30; color: #cfd3e6; padding: 20px 14px; display: flex; flex-direction: column">
-      <div style="font: 600 15px 'Public Sans'; color: #fff; margin-bottom: 18px">Captain LMS · Manager</div>
-      <RouterLink
-        v-for="l in links"
-        :key="l.to"
-        :to="l.to"
-        style="
-          display: block;
-          padding: 9px 10px;
-          border-radius: 8px;
-          color: #aab0cb;
-          text-decoration: none;
-          font: 600 13.5px 'Public Sans';
-          margin-bottom: 2px;
-        "
-        active-class="router-link-active-nav"
+  <div class="shell active">
+    <aside class="rail">
+      <div class="brandmark"><span class="mark">C</span><span>Captain LMS · Manager</span></div>
+      <RouterLink v-for="l in links" :key="l.to" :to="l.to" class="navlink"
+        ><span>{{ l.icon }}</span> {{ l.label }}</RouterLink
       >
-        {{ l.label }}
-      </RouterLink>
-      <div style="margin-top: auto; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.1)">
-        <div style="font: 600 12.5px 'Public Sans'; color: #f1f2f6">{{ auth.profile?.full_name }}</div>
-        <div style="font: 500 11px 'IBM Plex Mono'; color: #8991b3; margin-bottom: 10px">
-          {{ auth.profile?.department }} MANAGER
+      <div class="rail-foot">
+        <ThemeToggle variant="mini" />
+        <div class="who">
+          <div class="avatar">{{ auth.profile?.full_name?.slice(0, 2).toUpperCase() }}</div>
+          <div>
+            <div class="nm">{{ auth.profile?.full_name }}</div>
+            <div class="rl">{{ auth.profile?.department?.toUpperCase() }} MANAGER</div>
+          </div>
         </div>
-        <button
-          style="background: none; border: none; color: #e08975; font: 600 12.5px 'Public Sans'; cursor: pointer; padding: 0"
-          @click="logout"
-        >
-          Sign out
-        </button>
+        <button class="signout" @click="logout">Sign out</button>
       </div>
     </aside>
-    <main style="padding: 26px 28px">
+
+    <div class="main">
+      <div class="mobile-topbar">
+        <div class="brandmark"><span class="mark">C</span><span>Captain LMS</span></div>
+        <div style="display: flex; align-items: center; gap: 4px">
+          <ThemeToggle variant="icon" />
+          <button class="theme-cycle-btn" style="color: #e08975" title="Sign out" @click="logout">⏻</button>
+        </div>
+      </div>
+
       <RouterView />
-    </main>
+
+      <nav class="mobile-tabbar">
+        <RouterLink v-for="l in links" :key="l.to" :to="l.to" class="navlink"
+          ><span>{{ l.icon }}</span> {{ l.short }}</RouterLink
+        >
+      </nav>
+    </div>
   </div>
 </template>

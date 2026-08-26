@@ -17,19 +17,17 @@ onMounted(async () => {
 
 <template>
   <div>
-    <h2 style="font-size: 23px; margin-bottom: 16px">Overview</h2>
-    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; max-width: 500px">
-      <div class="card" style="padding: 16px 18px">
-        <div style="font: 600 11.5px 'IBM Plex Mono'; color: var(--ink-soft); text-transform: uppercase">
-          Accounts
-        </div>
-        <div style="font-family: 'Newsreader'; font-size: 28px; font-weight: 600">{{ employeeCount }}</div>
+    <div class="topline">
+      <div><h2>Overview</h2></div>
+    </div>
+    <div class="stat-row" style="max-width: 460px; grid-template-columns: repeat(2, 1fr)">
+      <div class="card stat">
+        <div class="lbl">Accounts</div>
+        <div class="val">{{ employeeCount }}</div>
       </div>
-      <div class="card" style="padding: 16px 18px">
-        <div style="font: 600 11.5px 'IBM Plex Mono'; color: var(--ink-soft); text-transform: uppercase">
-          Published modules
-        </div>
-        <div style="font-family: 'Newsreader'; font-size: 28px; font-weight: 600">{{ moduleCount }}</div>
+      <div class="card stat">
+        <div class="lbl">Published modules</div>
+        <div class="val">{{ moduleCount }}</div>
       </div>
     </div>
   </div>

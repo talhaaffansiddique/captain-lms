@@ -22,36 +22,56 @@ onMounted(async () => {
   completions.value = compData ?? []
   loading.value = false
 })
+
+function isDone(moduleId: number) {
+  return completions.value.some((c) => c.module_id === moduleId && c.completed)
+}
 </script>
 
 <template>
   <div>
-    <h2 style="font-size: 23px; margin-bottom: 4px">Welcome back, {{ auth.profile?.full_name }}</h2>
-    <p style="color: var(--ink-soft); font-size: 13.5px; margin-bottom: 22px">
-      {{ auth.profile?.department }} track
-    </p>
+    <div class="topline">
+      <div>
+        <h2>Welcome back, {{ auth.profile?.full_name?.split(' ')[0] }}</h2>
+        <p>{{ auth.profile?.department }} track</p>
+      </div>
+      <RouterLink class="btn btn-primary btn-sm" to="/app/modules">Continue training →</RouterLink>
+    </div>
 
     <div v-if="loading" style="color: var(--ink-soft)">Loading…</div>
-    <div v-else class="card" style="padding: 18px">
-      <div style="font: 600 13px 'Public Sans'; margin-bottom: 10px">
-        {{ completions.filter((c) => c.completed).length }} / {{ modules.length }} modules completed
+    <template v-else>
+      <div class="stat-row">
+        <div class="card stat">
+          <div class="lbl">Modules completed</div>
+          <div class="val">
+            {{ completions.filter((c) => c.completed).length }} <span class="of">/ {{ modules.length }}</span>
+          </div>
+        </div>
+        <div class="card stat">
+          <div class="lbl">Department</div>
+          <div class="val" style="font-size: 20px">{{ auth.profile?.department }}</div>
+        </div>
+        <div class="card stat">
+          <div class="lbl">Role</div>
+          <div class="val" style="font-size: 20px; text-transform: capitalize">{{ auth.profile?.role }}</div>
+        </div>
       </div>
-      <RouterLink
-        v-for="m in modules"
-        :key="m.id"
-        :to="`/app/modules/${m.id}`"
-        style="
-          display: block;
-          padding: 10px 0;
-          border-top: 1px solid var(--border);
-          text-decoration: none;
-          color: var(--ink);
-          font: 600 13.5px 'Public Sans';
-        "
-      >
-        {{ m.title }}
-        <span style="color: var(--ink-soft); font-weight: 500"> — {{ m.department }}</span>
-      </RouterLink>
-    </div>
+
+      <div class="card">
+        <div class="panel-title"><h3>Your modules</h3></div>
+        <RouterLink v-for="m in modules" :key="m.id" :to="`/app/modules/${m.id}`" :class="['row-item', { done: isDone(m.id) }]">
+          <div class="row-num">{{ isDone(m.id) ? '✓' : m.id }}</div>
+          <div class="row-info">
+            <div class="t">{{ m.title }}</div>
+            <div class="m">
+              {{ m.department }} · {{ isDone(m.id) ? 'Completed' : 'Not started' }}
+            </div>
+          </div>
+        </RouterLink>
+        <p v-if="!modules.length" style="padding: 24px; text-align: center; color: var(--ink-soft)">
+          No modules published yet — check back soon.
+        </p>
+      </div>
+    </template>
   </div>
 </template>

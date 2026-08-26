@@ -11,7 +11,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undef
 export const supabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey)
 
 if (!supabaseConfigured) {
-  // eslint-disable-next-line no-console
+   
   console.warn(
     'Supabase env vars are missing. Copy .env.example to .env.local and fill in your Supabase project URL + anon key. Using placeholder values for now so the app can still render.',
   )

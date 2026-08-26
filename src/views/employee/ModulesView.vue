@@ -2,46 +2,50 @@
 import { ref, onMounted } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
-import type { Module } from '@/lib/database.types'
+import type { Module, VideoCompletion } from '@/lib/database.types'
 
 const auth = useAuthStore()
 const modules = ref<Module[]>([])
+const completions = ref<VideoCompletion[]>([])
 
 onMounted(async () => {
   const dept = auth.profile?.department
-  if (!dept) return
-  const { data } = await supabase
-    .from('modules')
-    .select('*')
-    .or(`department.eq.General,department.eq.${dept}`)
-    .order('id')
-  modules.value = data ?? []
+  const userId = auth.profile?.id
+  if (!dept || !userId) return
+  const [{ data: modData }, { data: compData }] = await Promise.all([
+    supabase.from('modules').select('*').or(`department.eq.General,department.eq.${dept}`).order('id'),
+    supabase.from('video_completions').select('*').eq('user_id', userId),
+  ])
+  modules.value = modData ?? []
+  completions.value = compData ?? []
 })
+
+function isDone(moduleId: number) {
+  return completions.value.some((c) => c.module_id === moduleId && c.completed)
+}
 </script>
 
 <template>
   <div>
-    <h2 style="font-size: 23px; margin-bottom: 4px">My Modules</h2>
-    <p style="color: var(--ink-soft); font-size: 13.5px; margin-bottom: 22px">
-      General training everyone gets, plus your department's track.
-    </p>
+    <div class="topline">
+      <div>
+        <h2>My Modules</h2>
+        <p>General training everyone gets, plus your department's track.</p>
+      </div>
+    </div>
 
     <div class="card">
       <RouterLink
         v-for="m in modules"
         :key="m.id"
         :to="`/app/modules/${m.id}`"
-        style="
-          display: flex;
-          justify-content: space-between;
-          padding: 13px 16px;
-          border-top: 1px solid var(--border);
-          text-decoration: none;
-          color: var(--ink);
-        "
+        :class="['row-item', { done: isDone(m.id) }]"
       >
-        <span style="font: 600 14px 'Public Sans'">{{ m.title }}</span>
-        <span style="font: 500 12px 'IBM Plex Mono'; color: var(--ink-soft)">{{ m.department }}</span>
+        <div class="row-num">{{ isDone(m.id) ? '✓' : m.id }}</div>
+        <div class="row-info">
+          <div class="t">{{ m.title }} <span class="pill pill-outline">{{ m.department }}</span></div>
+          <div class="m">{{ Math.round(m.duration_seconds / 60) }} min · {{ isDone(m.id) ? 'Completed' : 'Not started' }}</div>
+        </div>
       </RouterLink>
       <p v-if="!modules.length" style="padding: 24px; text-align: center; color: var(--ink-soft)">
         No modules published yet — check back soon.

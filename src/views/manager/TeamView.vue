@@ -17,15 +17,18 @@ onMounted(async () => {
 
 <template>
   <div>
-    <h2 style="font-size: 23px; margin-bottom: 16px">My Team</h2>
+    <div class="topline">
+      <div><h2>My Team</h2></div>
+    </div>
     <div class="card">
-      <div
-        v-for="p in team"
-        :key="p.id"
-        style="padding: 12px 16px; border-top: 1px solid var(--border); font: 600 13.5px 'Public Sans'"
-      >
-        {{ p.full_name }}
+      <div v-for="p in team" :key="p.id" class="row-item" style="cursor: default">
+        <div class="avatar">{{ p.full_name.slice(0, 2).toUpperCase() }}</div>
+        <div class="row-info">
+          <div class="t">{{ p.full_name }}</div>
+          <div class="m" style="text-transform: capitalize">{{ p.role }}</div>
+        </div>
       </div>
+      <p v-if="!team.length" style="padding: 24px; text-align: center; color: var(--ink-soft)">No one on this team yet.</p>
     </div>
   </div>
 </template>

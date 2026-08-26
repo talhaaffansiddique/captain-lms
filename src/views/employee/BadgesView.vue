@@ -27,23 +27,20 @@ onMounted(async () => {
 
 <template>
   <div>
-    <h2 style="font-size: 23px; margin-bottom: 16px">My Badges</h2>
-    <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px">
-      <div
-        v-for="t in BADGE_TIERS"
-        :key="t.m"
-        class="card"
-        :style="{ padding: '18px 10px', textAlign: 'center', opacity: passedMilestones.has(t.m) ? 1 : 0.4 }"
-      >
-        <div style="font-size: 24px; margin-bottom: 6px">{{ t.icon }}</div>
-        <div style="font: 600 12.5px 'Public Sans'">{{ t.name }}</div>
+    <div class="topline">
+      <div>
+        <h2>My Badges</h2>
+        <p>Earned by passing each milestone quiz — quizzes aren't wired up yet, so these stay locked for now.</p>
       </div>
-      <div
-        class="card"
-        :style="{ padding: '18px 10px', textAlign: 'center', opacity: passedMilestones.has('final') ? 1 : 0.4 }"
-      >
-        <div style="font-size: 24px; margin-bottom: 6px">🏆</div>
-        <div style="font: 600 12.5px 'Public Sans'">Captain Master</div>
+    </div>
+    <div class="badge-grid">
+      <div v-for="t in BADGE_TIERS" :key="t.m" :class="['card', 'badge-tile', { locked: !passedMilestones.has(t.m) }]">
+        <div class="badge-medal">{{ t.icon }}</div>
+        <div class="bname">{{ t.name }}</div>
+      </div>
+      <div :class="['card', 'badge-tile', { locked: !passedMilestones.has('final') }]">
+        <div class="badge-medal">🏆</div>
+        <div class="bname">Captain Master</div>
       </div>
     </div>
   </div>

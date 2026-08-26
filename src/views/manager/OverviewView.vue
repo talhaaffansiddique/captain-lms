@@ -19,15 +19,15 @@ onMounted(async () => {
 
 <template>
   <div>
-    <h2 style="font-size: 23px; margin-bottom: 4px">Team Overview</h2>
-    <p style="color: var(--ink-soft); font-size: 13.5px; margin-bottom: 16px">
-      Read-only — {{ auth.profile?.department }}
-    </p>
-    <div class="card stat" style="padding: 16px 18px; max-width: 200px">
-      <div style="font: 600 11.5px 'IBM Plex Mono'; color: var(--ink-soft); text-transform: uppercase">
-        Team size
+    <div class="topline">
+      <div>
+        <h2>Team Overview</h2>
+        <p>Read-only — {{ auth.profile?.department }}</p>
       </div>
-      <div style="font-family: 'Newsreader'; font-size: 28px; font-weight: 600">{{ teamSize }}</div>
+    </div>
+    <div class="card stat" style="max-width: 200px">
+      <div class="lbl">Team size</div>
+      <div class="val">{{ teamSize }}</div>
     </div>
   </div>
 </template>

@@ -43,18 +43,20 @@ async function createDraft() {
 
 <template>
   <div>
-    <h2 style="font-size: 23px; margin-bottom: 16px">Modules</h2>
+    <div class="topline">
+      <div><h2>Modules</h2></div>
+    </div>
 
     <div class="card" style="padding: 18px; margin-bottom: 20px; max-width: 460px">
-      <div style="margin-bottom: 12px">
+      <div class="field">
         <label>Module title</label>
         <input v-model="title" type="text" placeholder="e.g. Handling Refund Requests" />
       </div>
-      <div style="margin-bottom: 12px">
+      <div class="field">
         <label>YouTube video ID (optional)</label>
         <input v-model="youtubeId" type="text" placeholder="e.g. dQw4w9WgXcQ" />
       </div>
-      <div style="margin-bottom: 14px">
+      <div class="field">
         <label>Audience</label>
         <select v-model="department">
           <option v-for="d in DEPARTMENTS" :key="d" :value="d">{{ d }}</option>
@@ -63,26 +65,26 @@ async function createDraft() {
       <button class="btn btn-primary" :disabled="saving" @click="createDraft">
         {{ saving ? 'Saving…' : 'Save as draft' }}
       </button>
-      <p style="font-size: 12px; color: var(--ink-soft); margin-top: 8px">
-        Add at least 10 quiz questions (via Supabase for now) before publishing — see the TODO in this file.
-      </p>
+      <p class="hint">Add at least 10 quiz questions (via Supabase for now) before publishing — see the TODO in this file.</p>
     </div>
 
-    <div class="card">
-      <table style="width: 100%; border-collapse: collapse; font-size: 13.5px">
+    <div class="card table-wrap">
+      <table>
         <thead>
           <tr>
-            <th style="text-align: left; padding: 10px 16px; border-bottom: 1px solid var(--border)">Title</th>
-            <th style="text-align: left; padding: 10px 16px; border-bottom: 1px solid var(--border)">Audience</th>
-            <th style="text-align: left; padding: 10px 16px; border-bottom: 1px solid var(--border)">Status</th>
+            <th>Title</th>
+            <th>Audience</th>
+            <th>Status</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="m in modules" :key="m.id">
-            <td style="padding: 12px 16px; border-bottom: 1px solid var(--border)">{{ m.title }}</td>
-            <td style="padding: 12px 16px; border-bottom: 1px solid var(--border)">{{ m.department }}</td>
-            <td style="padding: 12px 16px; border-bottom: 1px solid var(--border)">
-              {{ m.is_draft ? 'Draft' : 'Published' }}
+            <td style="font-weight: 600">{{ m.title }}</td>
+            <td><span class="pill pill-outline">{{ m.department }}</span></td>
+            <td>
+              <span :class="['pill', m.is_draft ? 'pill-danger' : 'pill-teal']">
+                {{ m.is_draft ? 'Draft' : 'Published' }}
+              </span>
             </td>
           </tr>
         </tbody>
