@@ -1,0 +1,119 @@
+import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+
+const router = createRouter({
+  history: createWebHistory(import.meta.env.BASE_URL),
+  routes: [
+    { path: '/', redirect: '/login' },
+    {
+      path: '/login',
+      name: 'login',
+      component: () => import('@/views/auth/LoginView.vue'),
+      meta: { public: true },
+    },
+    {
+      path: '/app',
+      component: () => import('@/components/layout/EmployeeLayout.vue'),
+      meta: { role: 'employee' },
+      children: [
+        { path: '', redirect: '/app/dashboard' },
+        {
+          path: 'dashboard',
+          name: 'employee-dashboard',
+          component: () => import('@/views/employee/DashboardView.vue'),
+        },
+        {
+          path: 'modules',
+          name: 'employee-modules',
+          component: () => import('@/views/employee/ModulesView.vue'),
+        },
+        {
+          path: 'modules/:id',
+          name: 'employee-player',
+          component: () => import('@/views/employee/PlayerView.vue'),
+        },
+        {
+          path: 'quiz/:milestone',
+          name: 'employee-quiz',
+          component: () => import('@/views/employee/QuizView.vue'),
+        },
+        {
+          path: 'badges',
+          name: 'employee-badges',
+          component: () => import('@/views/employee/BadgesView.vue'),
+        },
+        {
+          path: 'leaderboard',
+          name: 'employee-leaderboard',
+          component: () => import('@/views/employee/LeaderboardView.vue'),
+        },
+        {
+          path: 'account',
+          name: 'employee-account',
+          component: () => import('@/views/employee/AccountView.vue'),
+        },
+      ],
+    },
+    {
+      path: '/admin',
+      component: () => import('@/components/layout/AdminLayout.vue'),
+      meta: { role: 'admin' },
+      children: [
+        { path: '', redirect: '/admin/overview' },
+        {
+          path: 'overview',
+          name: 'admin-overview',
+          component: () => import('@/views/admin/OverviewView.vue'),
+        },
+        {
+          path: 'employees',
+          name: 'admin-employees',
+          component: () => import('@/views/admin/EmployeesView.vue'),
+        },
+        {
+          path: 'modules',
+          name: 'admin-modules',
+          component: () => import('@/views/admin/ModulesView.vue'),
+        },
+      ],
+    },
+    {
+      path: '/manager',
+      component: () => import('@/components/layout/ManagerLayout.vue'),
+      meta: { role: 'manager' },
+      children: [
+        { path: '', redirect: '/manager/overview' },
+        {
+          path: 'overview',
+          name: 'manager-overview',
+          component: () => import('@/views/manager/OverviewView.vue'),
+        },
+        {
+          path: 'team',
+          name: 'manager-team',
+          component: () => import('@/views/manager/TeamView.vue'),
+        },
+      ],
+    },
+  ],
+})
+
+router.beforeEach(async (to) => {
+  if (to.meta.public) return true
+
+  const auth = useAuthStore()
+  if (auth.loading) await auth.fetchProfile()
+
+  if (!auth.isLoggedIn) return { name: 'login' }
+
+  const requiredRole = to.meta.role as string | undefined
+  if (requiredRole && auth.role !== requiredRole) {
+    // Signed in, but this route belongs to a different role — send them home for their own role.
+    if (auth.role === 'admin') return '/admin'
+    if (auth.role === 'manager') return '/manager'
+    return '/app'
+  }
+  return true
+})
+
+export default router

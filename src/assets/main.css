@@ -1,0 +1,54 @@
+@import './base.css';
+
+#app {
+  min-height: 100vh;
+}
+
+.btn {
+  appearance: none;
+  border: none;
+  border-radius: 8px;
+  font:
+    600 14px 'Public Sans',
+    sans-serif;
+  padding: 11px 18px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-primary {
+  background: var(--ink);
+  color: var(--paper);
+}
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--ink);
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+input,
+select,
+textarea {
+  width: 100%;
+  font:
+    500 14.5px 'Public Sans',
+    sans-serif;
+  padding: 11px 13px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--paper);
+  color: var(--ink);
+}
+label {
+  font:
+    600 12.5px 'Public Sans',
+    sans-serif;
+  color: var(--ink-soft);
+  display: block;
+  margin-bottom: 6px;
+}

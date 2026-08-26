@@ -1,0 +1,91 @@
+/* ---------- Captain LMS design tokens (ported from the click-through demo) ---------- */
+:root {
+  --ink: #17203a;
+  --ink-soft: #3c4560;
+  --paper: #f1f2f6;
+  --surface: #ffffff;
+  --surface-sunken: #e8e9ef;
+  --border: #d7d9e3;
+  --brass: #a9761f;
+  --brass-strong: #8a5f16;
+  --brass-soft: #f3e6cd;
+  --teal: #1f6f63;
+  --teal-soft: #dcede9;
+  --danger: #a8412f;
+  --danger-soft: #f3e0db;
+  --shadow: 0 1px 2px rgba(23, 32, 58, 0.06), 0 8px 24px -12px rgba(23, 32, 58, 0.18);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --ink: #eef0f6;
+    --ink-soft: #b7bcd2;
+    --paper: #12141f;
+    --surface: #1a1d2b;
+    --surface-sunken: #1f2333;
+    --border: #2e3346;
+    --brass: #d7a83f;
+    --brass-strong: #eec26a;
+    --brass-soft: #33291a;
+    --teal: #5cba9f;
+    --teal-soft: #193029;
+    --danger: #e08975;
+    --danger-soft: #3a2320;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 28px -14px rgba(0, 0, 0, 0.6);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --ink: #eef0f6;
+  --ink-soft: #b7bcd2;
+  --paper: #12141f;
+  --surface: #1a1d2b;
+  --surface-sunken: #1f2333;
+  --border: #2e3346;
+  --brass: #d7a83f;
+  --brass-strong: #eec26a;
+  --brass-soft: #33291a;
+  --teal: #5cba9f;
+  --teal-soft: #193029;
+  --danger: #e08975;
+  --danger-soft: #3a2320;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 28px -14px rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family:
+    'Public Sans',
+    ui-sans-serif,
+    system-ui,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3 {
+  font-family:
+    'Newsreader',
+    ui-serif,
+    Georgia,
+    serif;
+  font-weight: 600;
+  text-wrap: balance;
+  letter-spacing: -0.01em;
+}
+
+a {
+  color: inherit;
+}
