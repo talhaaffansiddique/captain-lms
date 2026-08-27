@@ -3,7 +3,10 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
+import BaseModal from '@/components/BaseModal.vue'
 import type { Notification } from '@/lib/database.types'
+
+withDefaults(defineProps<{ variant?: 'navlink' | 'icon' }>(), { variant: 'navlink' })
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -26,15 +29,23 @@ async function load() {
 onMounted(load)
 defineExpose({ load })
 
-function toggle() {
-  open.value = !open.value
+async function openModal() {
+  open.value = true
+  // Matches the demo: opening the panel marks everything as read.
+  const unread = items.value.filter((n) => !n.read)
+  if (unread.length) {
+    await supabase
+      .from('notifications')
+      .update({ read: true })
+      .in(
+        'id',
+        unread.map((n) => n.id),
+      )
+    for (const n of unread) n.read = true
+  }
 }
 
-async function handleClick(n: Notification) {
-  if (!n.read) {
-    await supabase.from('notifications').update({ read: true }).eq('id', n.id)
-    n.read = true
-  }
+function handleClick(n: Notification) {
   open.value = false
   if (n.action?.type === 'open-quiz') router.push(`/app/quiz/${n.action.milestone}`)
   else if (n.action?.type === 'goto') router.push(`/app/${n.action.view}`)
@@ -42,28 +53,49 @@ async function handleClick(n: Notification) {
 </script>
 
 <template>
-  <div class="notif-wrap">
-    <button class="theme-cycle-btn" :class="{ shake: unreadCount > 0 }" title="Notifications" @click="toggle">
-      🔔
-      <span v-if="unreadCount > 0" class="notif-badge">{{ unreadCount }}</span>
+  <button
+    v-if="variant === 'navlink'"
+    class="navlink"
+    style="justify-content: space-between; width: 100%"
+    @click="openModal"
+  >
+    <span style="display: flex; align-items: center; gap: 10px">
+      <span :class="{ shake: unreadCount > 0 }">🔔</span>
+      Notifications
+    </span>
+    <span v-if="unreadCount > 0" class="bell-count">{{ unreadCount }}</span>
+  </button>
+
+  <button v-else class="theme-cycle-btn bell-btn-icon" title="Notifications" @click="openModal">
+    🔔
+    <span v-if="unreadCount > 0" class="bell-count bell-count-icon">{{ unreadCount }}</span>
+  </button>
+
+  <BaseModal v-if="open" title="Notifications" @close="open = false">
+    <div v-if="!items.length" style="padding: 10px 0; color: var(--ink-soft); font-size: 13.5px">You're all caught up.</div>
+    <button
+      v-for="n in items"
+      :key="n.id"
+      class="notif-row"
+      :class="{ clickable: !!n.action }"
+      :disabled="!n.action"
+      @click="n.action && handleClick(n)"
+    >
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+        <span>{{ n.text }}</span>
+        <span v-if="n.action" style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--brass-strong); flex: none">
+          View →
+        </span>
+      </div>
+      <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--ink-soft); margin-top: 3px">
+        {{ new Date(n.created_at).toLocaleString() }}
+      </div>
     </button>
-    <div v-if="open" class="notif-panel">
-      <div v-if="!items.length" class="notif-empty">No notifications yet.</div>
-      <button v-for="n in items" :key="n.id" class="notif-item" :class="{ unread: !n.read }" @click="handleClick(n)">
-        {{ n.text }}
-      </button>
-    </div>
-  </div>
+  </BaseModal>
 </template>
 
 <style scoped>
-.notif-wrap {
-  position: relative;
-}
-.notif-badge {
-  position: absolute;
-  top: 2px;
-  right: 2px;
+.bell-count {
   min-width: 15px;
   height: 15px;
   padding: 0 3px;
@@ -74,9 +106,18 @@ async function handleClick(n: Notification) {
   font-weight: 700;
   line-height: 15px;
   text-align: center;
-  animation: notif-pulse 1.6s ease-in-out infinite;
+  flex: none;
+}
+.bell-count-icon {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+}
+.bell-btn-icon {
+  position: relative;
 }
 .shake {
+  display: inline-block;
   animation: notif-shake 2.4s ease-in-out infinite;
 }
 @keyframes notif-shake {
@@ -101,64 +142,29 @@ async function handleClick(n: Notification) {
     transform: rotate(0);
   }
 }
-@keyframes notif-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(224, 137, 117, 0.6);
-  }
-  50% {
-    box-shadow: 0 0 0 4px rgba(224, 137, 117, 0);
-  }
-}
-.notif-panel {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  width: 300px;
-  max-height: 360px;
-  overflow-y: auto;
-  background: var(--surface);
-  color: var(--ink);
-  border-radius: 10px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
-  z-index: 40;
-  padding: 6px;
-}
-.notif-empty {
-  padding: 18px;
-  text-align: center;
-  color: var(--ink-soft);
-  font-size: 13px;
-}
-.notif-item {
+.notif-row {
   display: block;
   width: 100%;
   text-align: left;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 0;
-  background: transparent;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--border);
+  padding: 10px 0;
+  font-size: 13.5px;
   color: var(--ink);
-  font-size: 13px;
-  line-height: 1.4;
+  font-family: 'Public Sans', sans-serif;
+}
+.notif-row:first-child {
+  border-top: none;
+}
+.notif-row.clickable {
   cursor: pointer;
+  margin: 0 -8px;
+  padding: 10px 8px;
+  border-radius: 8px;
+  width: calc(100% + 16px);
 }
-.notif-item:hover {
+.notif-row.clickable:hover {
   background: var(--surface-sunken);
-}
-.notif-item.unread {
-  font-weight: 600;
-  position: relative;
-  padding-left: 20px;
-}
-.notif-item.unread::before {
-  content: '';
-  position: absolute;
-  left: 8px;
-  top: 15px;
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--brass);
 }
 </style>

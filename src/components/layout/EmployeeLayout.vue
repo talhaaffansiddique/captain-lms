@@ -46,10 +46,10 @@ const initials = () =>
         ><span>{{ l.icon }}</span> {{ l.label }}
         <span v-if="l.dot && hasPendingQuiz" class="navlink-dot"></span
       ></RouterLink>
+      <NotificationsBell variant="navlink" />
       <div class="rail-foot">
         <div style="display: flex; align-items: center; gap: 6px">
           <ThemeToggle variant="mini" />
-          <NotificationsBell />
         </div>
         <div class="who">
           <div class="avatar">{{ initials() }}</div>
@@ -67,7 +67,7 @@ const initials = () =>
         <div class="brandmark"><span class="mark">C</span><span>Captain LMS</span></div>
         <div style="display: flex; align-items: center; gap: 4px">
           <ThemeToggle variant="icon" />
-          <NotificationsBell />
+          <NotificationsBell variant="icon" />
           <button
             class="theme-cycle-btn"
             style="color: #e08975"
