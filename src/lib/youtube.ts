@@ -6,6 +6,8 @@ export interface YTPlayer {
   getDuration(): number
   getPlayerState(): number
   seekTo(seconds: number, allowSeekAhead: boolean): void
+  playVideo(): void
+  pauseVideo(): void
   loadModule(module: string): void
   unloadModule(module: string): void
   setOption(module: string, option: string, value: unknown): void
@@ -16,17 +18,27 @@ interface YTPlayerEvent {
   target: YTPlayer
 }
 
+interface YTStateChangeEvent extends YTPlayerEvent {
+  data: number
+}
+
 interface YTNamespace {
   Player: new (
     el: HTMLElement,
     opts: {
       videoId: string
+      // Privacy-enhanced mode — the embed loads from youtube-nocookie.com instead of youtube.com,
+      // so playback doesn't tie into (or get personalized by) whatever Google/YouTube account the
+      // viewer happens to be signed into in that browser.
+      host?: string
       playerVars?: Record<string, unknown>
       events?: {
         onReady?: (e: YTPlayerEvent) => void
+        onStateChange?: (e: YTStateChangeEvent) => void
       }
     },
   ) => YTPlayer
+  PlayerState: { PLAYING: number; PAUSED: number; ENDED: number; BUFFERING: number; CUED: number }
 }
 
 declare global {

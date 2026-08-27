@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import { loadTrackData, reachedMilestones, hasPassed } from '@/lib/quiz'
 import { notifyQuizUnlocked } from '@/lib/notifications'
 import { loadYouTubeIframeApi, type YTPlayer } from '@/lib/youtube'
+import { documentEmbedUrl } from '@/lib/materials'
 import type { Module } from '@/lib/database.types'
 
 // Real watch-time tracking via the YouTube IFrame Player API: the furthest point actually
@@ -38,10 +39,12 @@ const playerEl = ref<HTMLDivElement | null>(null)
 const player = ref<YTPlayer | null>(null)
 const maxWatched = ref(0)
 const duration = ref(0)
+const isPlaying = ref(false)
 let pollTimer: ReturnType<typeof setInterval> | undefined
 let saveTimer: ReturnType<typeof setInterval> | undefined
 
 const hasVideo = computed(() => !!module_.value?.youtube_id)
+const hasDocument = computed(() => !hasVideo.value && !!module_.value?.document_url && !!module_.value.document_type)
 const watchedPct = computed(() => (duration.value > 0 ? Math.min(100, Math.round((maxWatched.value / duration.value) * 100)) : 0))
 
 onMounted(async () => {
@@ -75,7 +78,19 @@ function initPlayer() {
   if (!playerEl.value || !module_.value?.youtube_id || !window.YT) return
   player.value = new window.YT.Player(playerEl.value, {
     videoId: module_.value.youtube_id,
-    playerVars: { enablejsapi: 1, rel: 0, modestbranding: 1 },
+    // Privacy-enhanced (youtube-nocookie.com) host — doesn't tie playback to whatever Google
+    // account the viewer happens to be signed into, so no personalized related-video suggestions.
+    host: 'https://www.youtube-nocookie.com',
+    playerVars: {
+      enablejsapi: 1,
+      rel: 0, // no related videos on pause/end
+      modestbranding: 1,
+      iv_load_policy: 3, // no video annotations/cards
+      disablekb: 1, // no keyboard seeking/speed shortcuts
+      fs: 0, // no fullscreen button
+      controls: 0, // no native control bar at all — no scrubber, no speed menu, no skip-10s
+      playsinline: 1,
+    },
     events: {
       onReady: (e) => {
         duration.value = e.target.getDuration()
@@ -83,8 +98,17 @@ function initPlayer() {
         applyCaptions()
         startTimers()
       },
+      onStateChange: (e) => {
+        isPlaying.value = e.data === 1 // YT.PlayerState.PLAYING
+      },
     },
   })
+}
+
+function togglePlayback() {
+  if (!player.value) return
+  if (isPlaying.value) player.value.pauseVideo()
+  else player.value.playVideo()
 }
 
 function startTimers() {
@@ -194,9 +218,16 @@ watch([ccOn, ccLang], applyCaptions)
 
     <div class="card" style="padding: 16px; max-width: 640px">
       <div v-if="hasVideo" class="video-box"><div ref="playerEl" style="width: 100%; height: 100%" /></div>
-      <div v-else class="video-box video-placeholder">▶ No video attached yet</div>
+      <div v-else-if="hasDocument" class="video-box">
+        <iframe
+          :src="documentEmbedUrl(module_.document_url as string, module_.document_type as string)"
+          style="width: 100%; height: 100%; border: 0"
+        />
+      </div>
+      <div v-else class="video-box video-placeholder">▶ No learning material attached yet</div>
 
       <div v-if="hasVideo" style="margin-top: 10px; display: flex; align-items: center; gap: 8px">
+        <button class="btn btn-primary btn-sm" @click="togglePlayback">{{ isPlaying ? '⏸ Pause' : '▶ Play' }}</button>
         <button class="btn btn-ghost btn-sm" :class="{ 'btn-primary': ccOn }" title="Toggle captions" @click="ccOn = !ccOn">
           CC {{ ccOn ? 'on' : 'off' }}
         </button>
@@ -211,7 +242,9 @@ watch([ccOn, ccLang], applyCaptions)
       </div>
 
       <div style="margin-top: 16px; display: flex; align-items: center; gap: 12px">
-        <button v-if="!hasVideo && !completed" class="btn btn-primary" @click="markCompleteManually">Mark as watched</button>
+        <button v-if="!hasVideo && !completed" class="btn btn-primary" @click="markCompleteManually">
+          {{ hasDocument ? 'Mark as reviewed' : 'Mark as watched' }}
+        </button>
         <span v-if="completed" class="pill pill-teal">✓ Completed</span>
         <RouterLink class="btn btn-ghost btn-sm" to="/app/modules">Back to modules</RouterLink>
       </div>

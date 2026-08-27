@@ -13,12 +13,14 @@ create table if not exists profiles (
   created_at timestamptz not null default now()
 );
 
--- ---------- modules (training videos) ----------
+-- ---------- modules (training videos, or an uploaded PDF/PPTX/DOCX in place of a video) ----------
 create table if not exists modules (
   id bigint generated always as identity primary key,
   title text not null,
   department text not null default 'General', -- 'General' = visible to everyone
   youtube_id text,
+  document_url text, -- public URL in the module-materials storage bucket, if this module is a document instead of a video
+  document_type text, -- 'pdf' | 'pptx' | 'ppt' | 'docx' | 'doc' — inferred from the uploaded filename
   duration_seconds int not null default 300,
   is_draft boolean not null default true,
   scheduled_date date,
@@ -229,3 +231,28 @@ create trigger on_auth_user_created
 insert into departments (name) values
   ('Sales'), ('Engineering'), ('Finance'), ('Operations'), ('Marketing'), ('Customer Support')
 on conflict (name) do nothing;
+
+-- ---------- storage bucket for uploaded learning materials (PDF/PPTX/DOCX) ----------
+-- Public read so the browser-based PDF viewer and Microsoft's Office Online Viewer (used for
+-- PPTX/DOCX, since browsers can't render those natively) can both fetch the file directly by URL.
+insert into storage.buckets (id, name, public)
+values ('module-materials', 'module-materials', true)
+on conflict (id) do nothing;
+
+create policy "materials are publicly readable" on storage.objects
+  for select using (bucket_id = 'module-materials');
+create policy "admins upload materials" on storage.objects
+  for insert with check (
+    bucket_id = 'module-materials'
+    and exists (select 1 from profiles where id = auth.uid() and role = 'admin')
+  );
+create policy "admins update materials" on storage.objects
+  for update using (
+    bucket_id = 'module-materials'
+    and exists (select 1 from profiles where id = auth.uid() and role = 'admin')
+  );
+create policy "admins delete materials" on storage.objects
+  for delete using (
+    bucket_id = 'module-materials'
+    and exists (select 1 from profiles where id = auth.uid() and role = 'admin')
+  );

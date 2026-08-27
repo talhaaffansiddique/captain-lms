@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
 import { logActivity } from '@/lib/activity'
 import { loadDepartments } from '@/lib/departments'
+import { uploadModuleMaterial, documentEmbedUrl } from '@/lib/materials'
 import { MIN_QUESTIONS_TO_PUBLISH, parseBulkQuestions } from '@/lib/quiz'
 import type { Module, QuizQuestion, Department } from '@/lib/database.types'
 
@@ -36,6 +37,9 @@ const publishBusy = ref(false)
 const scheduledDate = ref('')
 const savingSchedule = ref(false)
 
+const uploadingMaterial = ref(false)
+const materialError = ref('')
+
 const editingId = ref<number | null>(null)
 const editQuestion = ref('')
 const editOptions = ref(['', '', '', ''])
@@ -64,16 +68,42 @@ onMounted(load)
 async function saveDetails() {
   if (!detailTitle.value.trim()) return
   savingDetails.value = true
+  const youtubeId = detailYoutubeId.value.trim() || null
   await supabase
     .from('modules')
     .update({
       title: detailTitle.value.trim(),
       department: detailDepartment.value,
-      youtube_id: detailYoutubeId.value.trim() || null,
+      youtube_id: youtubeId,
+      // A module has a video OR a document, not both — saving a YouTube ID clears any uploaded file.
+      ...(youtubeId ? { document_url: null, document_type: null } : {}),
     })
     .eq('id', moduleId)
   await logActivity(auth.profile?.id, `Updated details for "${detailTitle.value.trim()}"`)
   savingDetails.value = false
+  await load()
+}
+
+async function onMaterialSelected(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  materialError.value = ''
+  uploadingMaterial.value = true
+  const { url, type, error } = await uploadModuleMaterial(moduleId, file)
+  if (error || !url || !type) {
+    materialError.value = error ?? 'Upload failed.'
+  } else {
+    // A module has a video OR a document, not both — uploading a file clears any YouTube ID.
+    await supabase.from('modules').update({ document_url: url, document_type: type, youtube_id: null }).eq('id', moduleId)
+    await logActivity(auth.profile?.id, `Uploaded a ${type.toUpperCase()} document to "${module_.value?.title}"`)
+    await load()
+  }
+  uploadingMaterial.value = false
+}
+
+async function removeMaterial() {
+  await supabase.from('modules').update({ document_url: null, document_type: null }).eq('id', moduleId)
+  await logActivity(auth.profile?.id, `Removed the uploaded document from "${module_.value?.title}"`)
   await load()
 }
 
@@ -220,12 +250,37 @@ async function saveSchedule() {
     <div class="card" style="padding: 16px; margin-bottom: 20px; max-width: 640px">
       <div v-if="module_.youtube_id" class="video-box">
         <iframe
-          :src="`https://www.youtube.com/embed/${module_.youtube_id}`"
+          :src="`https://www.youtube-nocookie.com/embed/${module_.youtube_id}?rel=0&modestbranding=1&iv_load_policy=3`"
           style="width: 100%; height: 100%; border: 0"
           allowfullscreen
         />
       </div>
-      <div v-else class="video-box video-placeholder">▶ No video attached yet</div>
+      <div v-else-if="module_.document_url && module_.document_type" class="video-box">
+        <iframe
+          :src="documentEmbedUrl(module_.document_url, module_.document_type)"
+          style="width: 100%; height: 100%; border: 0"
+        />
+      </div>
+      <div v-else class="video-box video-placeholder">▶ No learning material attached yet</div>
+    </div>
+
+    <div class="card" style="padding: 18px; margin-bottom: 20px; max-width: 420px">
+      <div class="panel-title"><h3>Document (alternative to a video)</h3></div>
+      <p class="hint" style="margin-bottom: 8px">
+        Upload a PDF, PPTX, or DOCX instead of a video — it shows in the same space, above. Uploading one clears any
+        YouTube ID, and vice versa; a module can only have one or the other.
+      </p>
+      <input type="file" accept=".pdf,.pptx,.ppt,.docx,.doc" :disabled="uploadingMaterial" @change="onMaterialSelected" />
+      <p v-if="uploadingMaterial" class="hint" style="margin-top: 6px">Uploading…</p>
+      <p v-if="materialError" class="hint" style="color: var(--danger); margin-top: 6px">{{ materialError }}</p>
+      <div v-if="module_.document_url" style="margin-top: 8px; display: flex; align-items: center; gap: 8px">
+        <span class="pill pill-outline">{{ module_.document_type?.toUpperCase() }} attached</span>
+        <button class="btn btn-ghost btn-sm" @click="removeMaterial">Remove</button>
+      </div>
+      <p v-if="module_.document_type === 'pptx' || module_.document_type === 'ppt' || module_.document_type === 'docx' || module_.document_type === 'doc'" class="hint" style="margin-top: 6px">
+        PPTX/DOCX preview uses Microsoft's free Office Online Viewer, which needs the file reachable at a public URL —
+        it won't preview from a local dev server, only once deployed.
+      </p>
     </div>
 
     <div class="card" style="padding: 18px; margin-bottom: 20px; max-width: 420px">
