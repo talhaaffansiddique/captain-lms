@@ -3,7 +3,7 @@ import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
-import { loadTrackData, reachedMilestones, hasPassed } from '@/lib/quiz'
+import { loadTrackData, reachedMilestones, hasPassed, milestoneLabel } from '@/lib/quiz'
 import { notifyQuizUnlocked } from '@/lib/notifications'
 import { loadYouTubeIframeApi, type YTPlayer } from '@/lib/youtube'
 import { documentEmbedUrl } from '@/lib/materials'
@@ -177,7 +177,7 @@ async function markComplete() {
 
   const { track, completions, attempts } = await loadTrackData(auth.profile.id, auth.profile.department)
   for (const m of reachedMilestones(track, completions)) {
-    if (!hasPassed(m, attempts)) await notifyQuizUnlocked(auth.profile.id, m)
+    if (!hasPassed(m, attempts)) await notifyQuizUnlocked(auth.profile.id, m, milestoneLabel(m, track))
   }
 }
 
@@ -198,7 +198,7 @@ async function markCompleteManually() {
   )
   const { track, completions, attempts } = await loadTrackData(auth.profile.id, auth.profile.department)
   for (const m of reachedMilestones(track, completions)) {
-    if (!hasPassed(m, attempts)) await notifyQuizUnlocked(auth.profile.id, m)
+    if (!hasPassed(m, attempts)) await notifyQuizUnlocked(auth.profile.id, m, milestoneLabel(m, track))
   }
 }
 

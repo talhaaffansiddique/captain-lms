@@ -158,14 +158,24 @@ create policy "admins manage quiz questions" on quiz_questions
 create policy "authenticated users read quiz questions" on quiz_questions
   for select using (auth.role() = 'authenticated');
 
--- video_completions / quiz_attempts: users manage their own; admins/managers can read their team's
+-- video_completions / quiz_attempts: users manage their own; admins/managers can read their team's,
+-- and admins can also wipe an employee's history (e.g. when their department changes and none of
+-- their old progress applies to the new track anymore).
 create policy "users manage their own video completions" on video_completions
   for all using (auth.uid() = user_id);
+create policy "admins manage video completions" on video_completions
+  for all using (
+    exists (select 1 from profiles where id = auth.uid() and role = 'admin')
+  );
 create policy "users manage their own quiz attempts" on quiz_attempts
   for all using (auth.uid() = user_id);
 create policy "admins read all quiz attempts" on quiz_attempts
   for select using (
     exists (select 1 from profiles where id = auth.uid() and role in ('admin', 'manager'))
+  );
+create policy "admins delete quiz attempts" on quiz_attempts
+  for delete using (
+    exists (select 1 from profiles where id = auth.uid() and role = 'admin')
   );
 
 create policy "admins manage attempt grants" on quiz_attempt_grants

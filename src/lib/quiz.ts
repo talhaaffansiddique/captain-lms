@@ -8,30 +8,73 @@ export const BASE_MAX_ATTEMPTS = 3
 export const RETRY_COOLDOWN_SECONDS = 15
 export const MIN_QUESTIONS_TO_PUBLISH = 10
 
+// Department-specific modules still group every 5 into one shared milestone quiz, same as
+// before. General modules (company-wide, department === 'General') instead get one quiz each,
+// right after that single video/document — since everyone takes them, there's no reason to make
+// people wait for 4 more to unlock a check.
 export const NUMBERED_MILESTONES = ['1', '2', '3', '4', '5'] as const
-export type Milestone = (typeof NUMBERED_MILESTONES)[number] | 'final'
+export type Milestone = string
+
+const GENERAL_PREFIX = 'general-'
+
+export function isGeneralMilestone(milestone: Milestone): boolean {
+  return milestone.startsWith(GENERAL_PREFIX)
+}
+
+export function generalMilestoneId(moduleId: number): Milestone {
+  return `${GENERAL_PREFIX}${moduleId}`
+}
+
+function generalMilestoneModuleId(milestone: Milestone): number {
+  return Number(milestone.slice(GENERAL_PREFIX.length))
+}
 
 export function orderedTrack(modules: Module[]): Module[] {
   return [...modules].sort((a, b) => a.id - b.id)
 }
 
+export function generalModules(track: Module[]): Module[] {
+  return track.filter((m) => m.department === 'General')
+}
+
+export function departmentModules(track: Module[]): Module[] {
+  return track.filter((m) => m.department !== 'General')
+}
+
 /** The modules whose completion feeds a given milestone quiz. */
 export function moduleChunkForMilestone(track: Module[], milestone: Milestone): Module[] {
   if (milestone === 'final') return track
-  const idx = NUMBERED_MILESTONES.indexOf(milestone)
-  return track.slice(idx * QUESTIONS_PER_QUIZ, (idx + 1) * QUESTIONS_PER_QUIZ)
+  if (isGeneralMilestone(milestone)) {
+    const mod = track.find((m) => m.id === generalMilestoneModuleId(milestone))
+    return mod ? [mod] : []
+  }
+  const idx = NUMBERED_MILESTONES.indexOf(milestone as (typeof NUMBERED_MILESTONES)[number])
+  if (idx === -1) return []
+  return departmentModules(track).slice(idx * QUESTIONS_PER_QUIZ, (idx + 1) * QUESTIONS_PER_QUIZ)
+}
+
+/** Every milestone that could ever apply to this track, reached or not — one per General
+ * module, up to 5 numbered department milestones, plus the Final Assessment. */
+export function allMilestonesForTrack(track: Module[]): Milestone[] {
+  return [...generalModules(track).map((m) => generalMilestoneId(m.id)), ...NUMBERED_MILESTONES, 'final']
 }
 
 /** Milestones whose feeding chunk is fully watched — eligible to attempt, regardless of pass/fail state. */
 export function reachedMilestones(track: Module[], completions: VideoCompletion[]): Milestone[] {
   const doneIds = new Set(completions.filter((c) => c.completed).map((c) => c.module_id))
   const reached: Milestone[] = []
+
+  for (const gm of generalModules(track)) {
+    if (doneIds.has(gm.id)) reached.push(generalMilestoneId(gm.id))
+  }
+
   for (const m of NUMBERED_MILESTONES) {
     const chunk = moduleChunkForMilestone(track, m)
     if (chunk.length === QUESTIONS_PER_QUIZ && chunk.every((mod) => doneIds.has(mod.id))) {
       reached.push(m)
     }
   }
+
   if (track.length > 0 && track.every((mod) => doneIds.has(mod.id))) {
     reached.push('final')
   }
@@ -63,8 +106,15 @@ export function pendingMilestones(
   )
 }
 
-export function milestoneLabel(milestone: Milestone): string {
-  return milestone === 'final' ? 'Final Assessment' : `Milestone ${milestone} Quiz`
+/** `track` is only needed to resolve a General module's title into its quiz label — omit it and
+ * a generic fallback is used instead. */
+export function milestoneLabel(milestone: Milestone, track?: Module[]): string {
+  if (milestone === 'final') return 'Final Assessment'
+  if (isGeneralMilestone(milestone)) {
+    const mod = track?.find((m) => m.id === generalMilestoneModuleId(milestone))
+    return mod ? `${mod.title} Quiz` : 'Module Quiz'
+  }
+  return `Milestone ${milestone} Quiz`
 }
 
 export interface TrackData {

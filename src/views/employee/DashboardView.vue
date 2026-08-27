@@ -73,7 +73,7 @@ const isOverdue = computed(() => {
 
       <div v-if="nextQuiz" class="card" style="padding: 16px 20px; margin-bottom: 20px; background: var(--brass-soft); display: flex; align-items: center; justify-content: space-between; gap: 12px">
         <div>
-          <strong>{{ milestoneLabel(nextQuiz) }} is ready.</strong>
+          <strong>{{ milestoneLabel(nextQuiz, modules) }} is ready.</strong>
           <div style="color: var(--ink-soft); font-size: 13px">You've completed the modules that unlock it.</div>
         </div>
         <RouterLink class="btn btn-primary btn-sm" :to="`/app/quiz/${nextQuiz}`">Take quiz now →</RouterLink>

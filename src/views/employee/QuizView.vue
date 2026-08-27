@@ -19,7 +19,7 @@ import {
   shuffle,
   type Milestone,
 } from '@/lib/quiz'
-import type { QuizQuestion } from '@/lib/database.types'
+import type { QuizQuestion, Module } from '@/lib/database.types'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -32,6 +32,7 @@ const attemptNumber = ref(1)
 const maxAttempts = ref(3)
 const isFinalAttempt = ref(false)
 const cooldownRemaining = ref(0)
+const track = ref<Module[]>([])
 let cooldownTimer: ReturnType<typeof setInterval> | undefined
 
 interface RunQuestion extends QuizQuestion {
@@ -65,7 +66,8 @@ onBeforeUnmount(() => {
 
 onMounted(async () => {
   if (!auth.profile) return
-  const { track, completions, attempts, grants } = await loadTrackData(auth.profile.id, auth.profile.department)
+  const { track: loadedTrack, completions, attempts, grants } = await loadTrackData(auth.profile.id, auth.profile.department)
+  track.value = loadedTrack
 
   if (hasPassed(milestone, attempts)) {
     alreadyPassed.value = true
@@ -73,7 +75,7 @@ onMounted(async () => {
     return
   }
 
-  const reached = reachedMilestones(track, completions)
+  const reached = reachedMilestones(loadedTrack, completions)
   if (!reached.includes(milestone)) {
     phase.value = 'not-ready'
     return
@@ -108,7 +110,7 @@ onMounted(async () => {
     }
   }
 
-  const chunk = moduleChunkForMilestone(track, milestone)
+  const chunk = moduleChunkForMilestone(loadedTrack, milestone)
   const chunkIds = chunk.map((m) => m.id)
   const { data: bank } = await supabase.from('quiz_questions').select('*').in('module_id', chunkIds)
   const drawn = shuffle((bank ?? []) as QuizQuestion[]).slice(0, QUESTIONS_PER_QUIZ)
@@ -179,7 +181,7 @@ async function finishQuiz() {
     questions_snapshot: quizQuestions.value.map((q) => ({ question: q.question, options: q.shuffledOptions })),
   })
   if (passed.value) {
-    await notifyBadgeUnlocked(auth.profile!.id, milestone)
+    await notifyBadgeUnlocked(auth.profile!.id, milestone, milestoneLabel(milestone, track.value))
   }
   phase.value = 'results'
 }
@@ -190,30 +192,30 @@ async function finishQuiz() {
     <div v-if="phase === 'loading'" style="color: var(--ink-soft)">Loading…</div>
 
     <div v-else-if="phase === 'not-ready'">
-      <h2 style="font-size: 20px; margin-bottom: 8px">{{ milestoneLabel(milestone) }}</h2>
+      <h2 style="font-size: 20px; margin-bottom: 8px">{{ milestoneLabel(milestone, track) }}</h2>
       <p style="color: var(--ink-soft)">Finish the modules feeding this quiz before you can take it.</p>
       <RouterLink class="btn btn-primary btn-sm" to="/app/modules" style="margin-top: 16px; display: inline-block">Back to modules</RouterLink>
     </div>
 
     <div v-else-if="phase === 'already-passed'">
-      <h2 style="font-size: 20px; margin-bottom: 8px">{{ milestoneLabel(milestone) }}</h2>
+      <h2 style="font-size: 20px; margin-bottom: 8px">{{ milestoneLabel(milestone, track) }}</h2>
       <p style="color: var(--teal)">You've already passed this quiz.</p>
       <RouterLink class="btn btn-primary btn-sm" to="/app/badges" style="margin-top: 16px; display: inline-block">View badges</RouterLink>
     </div>
 
     <div v-else-if="phase === 'exhausted'">
-      <h2 style="font-size: 20px; margin-bottom: 8px">{{ milestoneLabel(milestone) }}</h2>
+      <h2 style="font-size: 20px; margin-bottom: 8px">{{ milestoneLabel(milestone, track) }}</h2>
       <p style="color: var(--danger)">You've used all {{ maxAttempts }} attempts without passing. Contact your admin for an extra attempt.</p>
       <RouterLink class="btn btn-ghost btn-sm" to="/app/dashboard" style="margin-top: 16px; display: inline-block">Back to dashboard</RouterLink>
     </div>
 
     <div v-else-if="phase === 'cooldown'">
-      <h2 style="font-size: 20px; margin-bottom: 8px">{{ milestoneLabel(milestone) }}</h2>
+      <h2 style="font-size: 20px; margin-bottom: 8px">{{ milestoneLabel(milestone, track) }}</h2>
       <p style="color: var(--ink-soft)">You can retry in {{ cooldownRemaining }}s.</p>
     </div>
 
     <div v-else-if="phase === 'rules'">
-      <h2 style="font-size: 20px; margin-bottom: 12px">{{ milestoneLabel(milestone) }} — Rules</h2>
+      <h2 style="font-size: 20px; margin-bottom: 12px">{{ milestoneLabel(milestone, track) }} — Rules</h2>
       <ul style="padding-left: 20px; color: var(--ink-soft); line-height: 1.9">
         <li>{{ quizQuestions.length }} questions, drawn at random</li>
         <li>{{ QUESTION_TIME_SECONDS / 60 }} minutes per question — unanswered counts as wrong</li>

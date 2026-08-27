@@ -5,10 +5,8 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
 import { logActivity } from '@/lib/activity'
 import { loadDepartments } from '@/lib/departments'
-import { NUMBERED_MILESTONES, milestoneLabel, attemptsFor, maxAttemptsFor, hasPassed, loadTrackData, type Milestone } from '@/lib/quiz'
-import type { Profile, QuizAttempt, QuizAttemptGrant, Department } from '@/lib/database.types'
-
-const MILESTONES: Milestone[] = [...NUMBERED_MILESTONES, 'final']
+import { allMilestonesForTrack, milestoneLabel, attemptsFor, maxAttemptsFor, hasPassed, loadTrackData } from '@/lib/quiz'
+import type { Profile, QuizAttempt, QuizAttemptGrant, Department, Module } from '@/lib/database.types'
 
 const route = useRoute()
 const router = useRouter()
@@ -28,6 +26,7 @@ const escalating = ref(false)
 const departments = ref<Department[]>([])
 const selectedDepartment = ref('')
 const savingDepartment = ref(false)
+const track = ref<Module[]>([])
 
 async function load() {
   loading.value = true
@@ -45,9 +44,10 @@ async function load() {
   selectedDepartment.value = emp?.department ?? 'General'
 
   if (emp) {
-    const { track, completions } = await loadTrackData(employeeId, emp.department)
-    const doneIds = new Set(completions.filter((c) => c.completed).map((c) => c.module_id))
-    allModulesDone.value = track.length > 0 && track.every((m) => doneIds.has(m.id))
+    const trackData = await loadTrackData(employeeId, emp.department)
+    track.value = trackData.track
+    const doneIds = new Set(trackData.completions.filter((c) => c.completed).map((c) => c.module_id))
+    allModulesDone.value = trackData.track.length > 0 && trackData.track.every((m) => doneIds.has(m.id))
   }
   loading.value = false
 }
@@ -56,11 +56,23 @@ onMounted(load)
 
 async function saveDepartment() {
   if (!employee.value || selectedDepartment.value === employee.value.department) return
+  const fromDept = employee.value.department
+  const toDept = selectedDepartment.value
+  const confirmed = window.confirm(
+    `Move ${employee.value.full_name} from ${fromDept} to ${toDept}?\n\nThis permanently clears their training history — every module completion, quiz attempt, badge, and granted extra attempt — since it no longer applies to the new department's track. This cannot be undone.`,
+  )
+  if (!confirmed) return
+
   savingDepartment.value = true
-  await supabase.from('profiles').update({ department: selectedDepartment.value }).eq('id', employeeId)
+  await supabase.from('profiles').update({ department: toDept }).eq('id', employeeId)
+  await Promise.all([
+    supabase.from('video_completions').delete().eq('user_id', employeeId),
+    supabase.from('quiz_attempts').delete().eq('user_id', employeeId),
+    supabase.from('quiz_attempt_grants').delete().eq('user_id', employeeId),
+  ])
   await logActivity(
     auth.profile?.id,
-    `Moved ${employee.value.full_name} from ${employee.value.department} to ${selectedDepartment.value}`,
+    `Moved ${employee.value.full_name} from ${fromDept} to ${toDept} and cleared their training history`,
   )
   savingDepartment.value = false
   await load()
@@ -88,11 +100,11 @@ async function sendEscalation() {
 }
 
 const rows = computed(() =>
-  MILESTONES.map((m) => {
+  allMilestonesForTrack(track.value).map((m) => {
     const used = attemptsFor(m, attempts.value)
     return {
       milestone: m,
-      label: milestoneLabel(m),
+      label: milestoneLabel(m, track.value),
       used: used.length,
       max: maxAttemptsFor(m, grants.value),
       passed: hasPassed(m, attempts.value),
@@ -109,7 +121,7 @@ async function grantExtra(milestone: string) {
     extra_attempts: 1,
     granted_by: auth.profile.id,
   })
-  await logActivity(auth.profile.id, `Granted ${employee.value?.full_name} an extra attempt on ${milestoneLabel(milestone as Milestone)}`)
+  await logActivity(auth.profile.id, `Granted ${employee.value?.full_name} an extra attempt on ${milestoneLabel(milestone, track.value)}`)
   granting.value = null
   await load()
 }
@@ -139,8 +151,8 @@ async function grantExtra(milestone: string) {
         {{ savingDepartment ? 'Saving…' : 'Save department' }}
       </button>
       <p class="hint" style="margin-top: 8px">
-        Changing this immediately changes which modules and milestone quizzes count toward their track — past quiz
-        results and completions stay on record either way.
+        Changing this clears their training history — module completions, quiz attempts, badges, and any granted
+        extra attempts — since none of it applies to the new department's track. You'll be asked to confirm.
       </p>
     </div>
 
