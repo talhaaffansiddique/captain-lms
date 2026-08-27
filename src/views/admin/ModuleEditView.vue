@@ -2,11 +2,14 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
+import { useAuthStore } from '@/stores/auth'
+import { logActivity } from '@/lib/activity'
 import { MIN_QUESTIONS_TO_PUBLISH, parseBulkQuestions } from '@/lib/quiz'
 import type { Module, QuizQuestion } from '@/lib/database.types'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 const moduleId = Number(route.params.id)
 
 const module_ = ref<Module | null>(null)
@@ -23,6 +26,14 @@ const bulkPreview = ref<ReturnType<typeof parseBulkQuestions>>([])
 const savingBulk = ref(false)
 
 const publishBusy = ref(false)
+const scheduledDate = ref('')
+const savingSchedule = ref(false)
+
+const editingId = ref<number | null>(null)
+const editQuestion = ref('')
+const editOptions = ref(['', '', '', ''])
+const editCorrect = ref(0)
+const savingEdit = ref(false)
 
 async function load() {
   loading.value = true
@@ -32,12 +43,16 @@ async function load() {
   ])
   module_.value = mod
   questions.value = qs ?? []
+  scheduledDate.value = mod?.scheduled_date ?? ''
   loading.value = false
 }
 
 onMounted(load)
 
 const canPublish = computed(() => questions.value.length >= MIN_QUESTIONS_TO_PUBLISH)
+const isScheduledFuture = computed(
+  () => !!module_.value?.scheduled_date && module_.value.scheduled_date > new Date().toISOString().slice(0, 10),
+)
 
 async function addQuestion() {
   if (!newQuestion.value.trim() || newOptions.value.some((o) => !o.trim())) return
@@ -60,6 +75,33 @@ async function removeQuestion(id: number) {
   await load()
 }
 
+function startEdit(q: QuizQuestion) {
+  editingId.value = q.id
+  editQuestion.value = q.question
+  editOptions.value = [...q.options]
+  editCorrect.value = q.correct_index
+}
+
+function cancelEdit() {
+  editingId.value = null
+}
+
+async function saveEdit() {
+  if (!editingId.value || !editQuestion.value.trim() || editOptions.value.some((o) => !o.trim())) return
+  savingEdit.value = true
+  await supabase
+    .from('quiz_questions')
+    .update({
+      question: editQuestion.value.trim(),
+      options: editOptions.value.map((o) => o.trim()),
+      correct_index: editCorrect.value,
+    })
+    .eq('id', editingId.value)
+  savingEdit.value = false
+  editingId.value = null
+  await load()
+}
+
 function previewBulk() {
   bulkPreview.value = parseBulkQuestions(bulkText.value)
 }
@@ -75,6 +117,7 @@ async function saveBulk() {
       correct_index: q.correct_index,
     })),
   )
+  await logActivity(auth.profile?.id, `Added ${bulkPreview.value.length} questions to "${module_.value?.title}"`)
   bulkText.value = ''
   bulkPreview.value = []
   savingBulk.value = false
@@ -85,11 +128,32 @@ async function togglePublish() {
   if (!module_.value) return
   if (module_.value.is_draft && !canPublish.value) return
   publishBusy.value = true
+  const nowPublishing = module_.value.is_draft
   await supabase
     .from('modules')
     .update({ is_draft: !module_.value.is_draft })
     .eq('id', moduleId)
+  await logActivity(
+    auth.profile?.id,
+    `${nowPublishing ? 'Published' : 'Unpublished'} "${module_.value.title}"`,
+  )
   publishBusy.value = false
+  await load()
+}
+
+async function saveSchedule() {
+  savingSchedule.value = true
+  await supabase
+    .from('modules')
+    .update({ scheduled_date: scheduledDate.value || null })
+    .eq('id', moduleId)
+  await logActivity(
+    auth.profile?.id,
+    scheduledDate.value
+      ? `Scheduled "${module_.value?.title}" to appear on ${scheduledDate.value}`
+      : `Cleared the publish schedule for "${module_.value?.title}"`,
+  )
+  savingSchedule.value = false
   await load()
 }
 </script>
@@ -115,9 +179,29 @@ async function togglePublish() {
       </div>
     </div>
 
-    <span :class="['pill', module_.is_draft ? 'pill-danger' : 'pill-teal']" style="margin-bottom: 16px; display: inline-block">
-      {{ module_.is_draft ? `Draft · ${questions.length} of ${MIN_QUESTIONS_TO_PUBLISH}` : 'Published' }}
+    <span :class="['pill', module_.is_draft ? 'pill-danger' : isScheduledFuture ? 'pill-outline' : 'pill-teal']" style="margin-bottom: 16px; display: inline-block">
+      {{
+        module_.is_draft
+          ? `Draft · ${questions.length} of ${MIN_QUESTIONS_TO_PUBLISH}`
+          : isScheduledFuture
+            ? `Scheduled for ${module_.scheduled_date}`
+            : 'Published'
+      }}
     </span>
+
+    <div class="card" style="padding: 18px; margin-bottom: 20px; max-width: 360px">
+      <div class="panel-title"><h3>Publish schedule</h3></div>
+      <p class="hint" style="margin-bottom: 8px">
+        Leave blank to show immediately once published. Set a future date to keep it hidden from employees until then.
+      </p>
+      <div class="field">
+        <label>Publish on</label>
+        <input v-model="scheduledDate" type="date" />
+      </div>
+      <button class="btn btn-ghost btn-sm" :disabled="savingSchedule" @click="saveSchedule">
+        {{ savingSchedule ? 'Saving…' : 'Save schedule' }}
+      </button>
+    </div>
 
     <div class="card" style="padding: 18px; margin-bottom: 20px">
       <div class="panel-title"><h3>Add a question</h3></div>
@@ -161,15 +245,35 @@ async function togglePublish() {
       <div class="panel-title"><h3>Question bank ({{ questions.length }})</h3></div>
       <div v-for="(q, i) in questions" :key="q.id" class="row-item" style="cursor: default; align-items: flex-start">
         <div class="row-num">{{ i + 1 }}</div>
-        <div class="row-info">
-          <div class="t">{{ q.question }}</div>
-          <div class="m">
-            <span v-for="(opt, oi) in q.options" :key="oi" :style="{ fontWeight: oi === q.correct_index ? 700 : 400 }">
-              {{ ['A', 'B', 'C', 'D'][oi] }}) {{ opt }}{{ oi < q.options.length - 1 ? ' · ' : '' }}
-            </span>
+
+        <div v-if="editingId === q.id" class="row-info">
+          <input v-model="editQuestion" type="text" style="margin-bottom: 8px" />
+          <div v-for="(_, oi) in editOptions" :key="oi" style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px">
+            <input type="radio" :checked="editCorrect === oi" @change="editCorrect = oi" />
+            <input v-model="editOptions[oi]" type="text" style="flex: 1" />
+          </div>
+          <div style="display: flex; gap: 8px; margin-top: 6px">
+            <button class="btn btn-primary btn-sm" :disabled="savingEdit" @click="saveEdit">
+              {{ savingEdit ? 'Saving…' : 'Save' }}
+            </button>
+            <button class="btn btn-ghost btn-sm" @click="cancelEdit">Cancel</button>
           </div>
         </div>
-        <button class="btn btn-ghost btn-sm" @click="removeQuestion(q.id)">Delete</button>
+
+        <template v-else>
+          <div class="row-info">
+            <div class="t">{{ q.question }}</div>
+            <div class="m">
+              <span v-for="(opt, oi) in q.options" :key="oi" :style="{ fontWeight: oi === q.correct_index ? 700 : 400 }">
+                {{ ['A', 'B', 'C', 'D'][oi] }}) {{ opt }}{{ oi < q.options.length - 1 ? ' · ' : '' }}
+              </span>
+            </div>
+          </div>
+          <div style="display: flex; gap: 6px">
+            <button class="btn btn-ghost btn-sm" @click="startEdit(q)">Edit</button>
+            <button class="btn btn-ghost btn-sm" @click="removeQuestion(q.id)">Delete</button>
+          </div>
+        </template>
       </div>
       <p v-if="!questions.length" style="padding: 24px; text-align: center; color: var(--ink-soft)">
         No questions yet — add some above.

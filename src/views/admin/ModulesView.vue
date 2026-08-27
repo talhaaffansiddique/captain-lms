@@ -28,6 +28,11 @@ async function loadModules() {
 
 onMounted(loadModules)
 
+const today = new Date().toISOString().slice(0, 10)
+function isScheduledFuture(m: Module) {
+  return !!m.scheduled_date && m.scheduled_date > today
+}
+
 async function createDraft() {
   if (!title.value.trim()) return
   saving.value = true
@@ -87,8 +92,14 @@ async function createDraft() {
             <td style="font-weight: 600">{{ m.title }}</td>
             <td><span class="pill pill-outline">{{ m.department }}</span></td>
             <td>
-              <span :class="['pill', m.is_draft ? 'pill-danger' : 'pill-teal']">
-                {{ m.is_draft ? `Draft · ${questionCounts[m.id] ?? 0} of ${MIN_QUESTIONS_TO_PUBLISH}` : 'Published' }}
+              <span :class="['pill', m.is_draft ? 'pill-danger' : isScheduledFuture(m) ? 'pill-outline' : 'pill-teal']">
+                {{
+                  m.is_draft
+                    ? `Draft · ${questionCounts[m.id] ?? 0} of ${MIN_QUESTIONS_TO_PUBLISH}`
+                    : isScheduledFuture(m)
+                      ? `Scheduled for ${m.scheduled_date}`
+                      : 'Published'
+                }}
               </span>
             </td>
             <td><RouterLink class="btn btn-ghost btn-sm" :to="`/admin/modules/${m.id}`">Manage questions</RouterLink></td>

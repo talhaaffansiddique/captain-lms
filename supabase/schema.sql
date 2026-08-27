@@ -111,11 +111,17 @@ alter table notifications enable row level security;
 alter table announcements enable row level security;
 alter table activity_log enable row level security;
 
--- profiles: everyone can read profiles (needed for leaderboard/team views); users can only edit their own
+-- profiles: everyone can read profiles (needed for leaderboard/team views); users can edit their
+-- own profile, and admins can edit any profile (needed for setting due dates, roles, etc. from
+-- the admin UI).
 create policy "profiles are readable by any authenticated user" on profiles
   for select using (auth.role() = 'authenticated');
 create policy "users can update their own profile" on profiles
   for update using (auth.uid() = id);
+create policy "admins can update any profile" on profiles
+  for update using (
+    exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'admin')
+  );
 
 -- modules: published, non-archived, non-scheduled-future modules are readable by everyone;
 -- admins can do everything. (Simplified — tighten department scoping with a function if needed.)
@@ -160,6 +166,10 @@ create policy "users read their own grants" on quiz_attempt_grants
 
 create policy "users manage their own notifications" on notifications
   for all using (auth.uid() = user_id);
+create policy "admins send notifications to anyone" on notifications
+  for insert with check (
+    exists (select 1 from profiles where id = auth.uid() and role = 'admin')
+  );
 
 create policy "everyone reads announcements" on announcements
   for select using (auth.role() = 'authenticated');

@@ -1,31 +1,53 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
 import { loadTrackData, pendingMilestones, milestoneLabel, type Milestone } from '@/lib/quiz'
-import type { Module, VideoCompletion } from '@/lib/database.types'
+import type { Module, VideoCompletion, Announcement } from '@/lib/database.types'
 
 const auth = useAuthStore()
 const modules = ref<Module[]>([])
 const completions = ref<VideoCompletion[]>([])
 const loading = ref(true)
 const nextQuiz = ref<Milestone | null>(null)
+const announcement = ref<Announcement | null>(null)
+const dismissedAnnouncementIds = ref<number[]>(JSON.parse(localStorage.getItem('dismissedAnnouncements') ?? '[]'))
 
 onMounted(async () => {
   const dept = auth.profile?.department
   const userId = auth.profile?.id
   if (!dept || !userId) return
 
-  const { track, completions: comp, attempts, grants } = await loadTrackData(userId, dept)
+  const [{ track, completions: comp, attempts, grants }, { data: latestAnnouncement }] = await Promise.all([
+    loadTrackData(userId, dept),
+    supabase.from('announcements').select('*').order('created_at', { ascending: false }).limit(1).maybeSingle(),
+  ])
   modules.value = track
   completions.value = comp
   const pending = pendingMilestones(track, comp, attempts, grants)
   nextQuiz.value = pending[0] ?? null
+  announcement.value = latestAnnouncement
   loading.value = false
 })
 
 function isDone(moduleId: number) {
   return completions.value.some((c) => c.module_id === moduleId && c.completed)
 }
+
+const showAnnouncement = computed(() => announcement.value && !dismissedAnnouncementIds.value.includes(announcement.value.id))
+
+function dismissAnnouncement() {
+  if (!announcement.value) return
+  dismissedAnnouncementIds.value = [...dismissedAnnouncementIds.value, announcement.value.id]
+  localStorage.setItem('dismissedAnnouncements', JSON.stringify(dismissedAnnouncementIds.value))
+}
+
+const isOverdue = computed(() => {
+  const due = auth.profile?.due_date
+  if (!due) return false
+  const allDone = modules.value.length > 0 && modules.value.every((m) => isDone(m.id))
+  return !allDone && due < new Date().toISOString().slice(0, 10)
+})
 </script>
 
 <template>
@@ -40,6 +62,15 @@ function isDone(moduleId: number) {
 
     <div v-if="loading" style="color: var(--ink-soft)">Loading…</div>
     <template v-else>
+      <div v-if="showAnnouncement" class="card" style="padding: 14px 20px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-left: 3px solid var(--brass)">
+        <div style="font-size: 13.5px">📣 {{ announcement?.text }}</div>
+        <button class="btn btn-ghost btn-sm" @click="dismissAnnouncement">Dismiss</button>
+      </div>
+
+      <div v-if="isOverdue" class="card" style="padding: 14px 20px; margin-bottom: 16px; background: var(--danger-soft); color: var(--danger)">
+        <strong>Your training deadline ({{ auth.profile?.due_date }}) has passed.</strong> Please complete your remaining modules as soon as possible.
+      </div>
+
       <div v-if="nextQuiz" class="card" style="padding: 16px 20px; margin-bottom: 20px; background: var(--brass-soft); display: flex; align-items: center; justify-content: space-between; gap: 12px">
         <div>
           <strong>{{ milestoneLabel(nextQuiz) }} is ready.</strong>
