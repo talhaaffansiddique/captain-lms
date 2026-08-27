@@ -4,8 +4,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
 import { logActivity } from '@/lib/activity'
+import { loadDepartments } from '@/lib/departments'
 import { NUMBERED_MILESTONES, milestoneLabel, attemptsFor, maxAttemptsFor, hasPassed, loadTrackData, type Milestone } from '@/lib/quiz'
-import type { Profile, QuizAttempt, QuizAttemptGrant } from '@/lib/database.types'
+import type { Profile, QuizAttempt, QuizAttemptGrant, Department } from '@/lib/database.types'
 
 const MILESTONES: Milestone[] = [...NUMBERED_MILESTONES, 'final']
 
@@ -24,17 +25,24 @@ const dueDate = ref('')
 const savingDueDate = ref(false)
 const escalating = ref(false)
 
+const departments = ref<Department[]>([])
+const selectedDepartment = ref('')
+const savingDepartment = ref(false)
+
 async function load() {
   loading.value = true
-  const [{ data: emp }, { data: att }, { data: grt }] = await Promise.all([
+  const [{ data: emp }, { data: att }, { data: grt }, depts] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', employeeId).single(),
     supabase.from('quiz_attempts').select('*').eq('user_id', employeeId),
     supabase.from('quiz_attempt_grants').select('*').eq('user_id', employeeId),
+    loadDepartments(),
   ])
   employee.value = emp
   attempts.value = att ?? []
   grants.value = grt ?? []
   dueDate.value = emp?.due_date ?? ''
+  departments.value = depts
+  selectedDepartment.value = emp?.department ?? 'General'
 
   if (emp) {
     const { track, completions } = await loadTrackData(employeeId, emp.department)
@@ -45,6 +53,18 @@ async function load() {
 }
 
 onMounted(load)
+
+async function saveDepartment() {
+  if (!employee.value || selectedDepartment.value === employee.value.department) return
+  savingDepartment.value = true
+  await supabase.from('profiles').update({ department: selectedDepartment.value }).eq('id', employeeId)
+  await logActivity(
+    auth.profile?.id,
+    `Moved ${employee.value.full_name} from ${employee.value.department} to ${selectedDepartment.value}`,
+  )
+  savingDepartment.value = false
+  await load()
+}
 
 const isOverdue = computed(() => !!dueDate.value && !allModulesDone.value && dueDate.value < new Date().toISOString().slice(0, 10))
 
@@ -104,6 +124,24 @@ async function grantExtra(milestone: string) {
         <p>{{ employee.department }} · {{ employee.role }}</p>
       </div>
       <button class="btn btn-ghost btn-sm" @click="router.push('/admin/employees')">Back to employees</button>
+    </div>
+
+    <div class="card" style="padding: 18px; margin-bottom: 20px; max-width: 420px">
+      <div class="panel-title"><h3>Department</h3></div>
+      <div class="field">
+        <label>Department</label>
+        <select v-model="selectedDepartment">
+          <option value="General">General</option>
+          <option v-for="d in departments" :key="d.id" :value="d.name">{{ d.name }}</option>
+        </select>
+      </div>
+      <button class="btn btn-ghost btn-sm" :disabled="savingDepartment || selectedDepartment === employee.department" @click="saveDepartment">
+        {{ savingDepartment ? 'Saving…' : 'Save department' }}
+      </button>
+      <p class="hint" style="margin-top: 8px">
+        Changing this immediately changes which modules and milestone quizzes count toward their track — past quiz
+        results and completions stay on record either way.
+      </p>
     </div>
 
     <div class="card" style="padding: 18px; margin-bottom: 20px; max-width: 420px">
