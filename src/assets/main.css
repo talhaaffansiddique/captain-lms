@@ -400,6 +400,19 @@ tr:last-child td {
   cursor: pointer;
   text-decoration: none;
 }
+.navlink-dot {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--danger);
+}
+.mobile-tabbar .navlink-dot {
+  top: 2px;
+  right: calc(50% - 14px);
+}
 .navlink:hover {
   background: rgba(255, 255, 255, 0.05);
   color: #e6e9f5;

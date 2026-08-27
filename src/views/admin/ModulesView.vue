@@ -2,24 +2,28 @@
 import { ref, onMounted } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
+import { MIN_QUESTIONS_TO_PUBLISH } from '@/lib/quiz'
 import type { Module } from '@/lib/database.types'
-
-// TODO: port the full Question Bank editor (manual rows + bulk paste + 10-question minimum
-// before publishing) from captain-lms-demo.html. This form creates a module as a draft —
-// add questions via Supabase directly (quiz_questions table) until that UI exists here.
 
 const DEPARTMENTS = ['General', 'Sales', 'Engineering', 'Finance', 'Operations', 'Marketing', 'Customer Support']
 
 const auth = useAuthStore()
 const modules = ref<Module[]>([])
+const questionCounts = ref<Record<number, number>>({})
 const title = ref('')
 const department = ref('General')
 const youtubeId = ref('')
 const saving = ref(false)
 
 async function loadModules() {
-  const { data } = await supabase.from('modules').select('*').order('id', { ascending: false })
-  modules.value = data ?? []
+  const [{ data: modData }, { data: qData }] = await Promise.all([
+    supabase.from('modules').select('*').order('id', { ascending: false }),
+    supabase.from('quiz_questions').select('module_id'),
+  ])
+  modules.value = modData ?? []
+  const counts: Record<number, number> = {}
+  for (const q of qData ?? []) counts[q.module_id] = (counts[q.module_id] ?? 0) + 1
+  questionCounts.value = counts
 }
 
 onMounted(loadModules)
@@ -65,7 +69,7 @@ async function createDraft() {
       <button class="btn btn-primary" :disabled="saving" @click="createDraft">
         {{ saving ? 'Saving…' : 'Save as draft' }}
       </button>
-      <p class="hint">Add at least 10 quiz questions (via Supabase for now) before publishing — see the TODO in this file.</p>
+      <p class="hint">Open a module below to add its question bank — {{ MIN_QUESTIONS_TO_PUBLISH }} questions are required before it can be published.</p>
     </div>
 
     <div class="card table-wrap">
@@ -75,6 +79,7 @@ async function createDraft() {
             <th>Title</th>
             <th>Audience</th>
             <th>Status</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -83,9 +88,10 @@ async function createDraft() {
             <td><span class="pill pill-outline">{{ m.department }}</span></td>
             <td>
               <span :class="['pill', m.is_draft ? 'pill-danger' : 'pill-teal']">
-                {{ m.is_draft ? 'Draft' : 'Published' }}
+                {{ m.is_draft ? `Draft · ${questionCounts[m.id] ?? 0} of ${MIN_QUESTIONS_TO_PUBLISH}` : 'Published' }}
               </span>
             </td>
+            <td><RouterLink class="btn btn-ghost btn-sm" :to="`/admin/modules/${m.id}`">Manage questions</RouterLink></td>
           </tr>
         </tbody>
       </table>

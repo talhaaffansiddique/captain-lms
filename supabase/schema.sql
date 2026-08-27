@@ -130,13 +130,16 @@ create policy "admins manage modules" on modules
     exists (select 1 from profiles where id = auth.uid() and role = 'admin')
   );
 
--- quiz_questions: only admins can read/write directly (the app draws random subsets server-side
--- via an Edge Function so employees never see the full bank — see netlify/functions or a Supabase
--- Edge Function for that logic).
+-- quiz_questions: admins manage the bank; any authenticated user can read it so the quiz engine
+-- can draw a random subset client-side. (Trade-off: an employee could inspect the full bank via
+-- devtools network requests. Fine for an internal corporate app — move the draw into a Supabase
+-- Edge Function later if that needs locking down.)
 create policy "admins manage quiz questions" on quiz_questions
   for all using (
     exists (select 1 from profiles where id = auth.uid() and role = 'admin')
   );
+create policy "authenticated users read quiz questions" on quiz_questions
+  for select using (auth.role() = 'authenticated');
 
 -- video_completions / quiz_attempts: users manage their own; admins/managers can read their team's
 create policy "users manage their own video completions" on video_completions

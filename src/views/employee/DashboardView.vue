@@ -1,25 +1,25 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
+import { loadTrackData, pendingMilestones, milestoneLabel, type Milestone } from '@/lib/quiz'
 import type { Module, VideoCompletion } from '@/lib/database.types'
 
 const auth = useAuthStore()
 const modules = ref<Module[]>([])
 const completions = ref<VideoCompletion[]>([])
 const loading = ref(true)
+const nextQuiz = ref<Milestone | null>(null)
 
 onMounted(async () => {
   const dept = auth.profile?.department
   const userId = auth.profile?.id
   if (!dept || !userId) return
 
-  const [{ data: modData }, { data: compData }] = await Promise.all([
-    supabase.from('modules').select('*').or(`department.eq.General,department.eq.${dept}`).order('id'),
-    supabase.from('video_completions').select('*').eq('user_id', userId),
-  ])
-  modules.value = modData ?? []
-  completions.value = compData ?? []
+  const { track, completions: comp, attempts, grants } = await loadTrackData(userId, dept)
+  modules.value = track
+  completions.value = comp
+  const pending = pendingMilestones(track, comp, attempts, grants)
+  nextQuiz.value = pending[0] ?? null
   loading.value = false
 })
 
@@ -40,6 +40,13 @@ function isDone(moduleId: number) {
 
     <div v-if="loading" style="color: var(--ink-soft)">Loading…</div>
     <template v-else>
+      <div v-if="nextQuiz" class="card" style="padding: 16px 20px; margin-bottom: 20px; background: var(--brass-soft); display: flex; align-items: center; justify-content: space-between; gap: 12px">
+        <div>
+          <strong>{{ milestoneLabel(nextQuiz) }} is ready.</strong>
+          <div style="color: var(--ink-soft); font-size: 13px">You've completed the modules that unlock it.</div>
+        </div>
+        <RouterLink class="btn btn-primary btn-sm" :to="`/app/quiz/${nextQuiz}`">Take quiz now →</RouterLink>
+      </div>
       <div class="stat-row">
         <div class="card stat">
           <div class="lbl">Modules completed</div>

@@ -75,6 +75,11 @@ const router = createRouter({
           name: 'admin-modules',
           component: () => import('@/views/admin/ModulesView.vue'),
         },
+        {
+          path: 'modules/:id',
+          name: 'admin-module-edit',
+          component: () => import('@/views/admin/ModuleEditView.vue'),
+        },
       ],
     },
     {

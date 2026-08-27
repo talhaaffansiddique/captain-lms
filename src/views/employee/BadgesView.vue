@@ -30,7 +30,7 @@ onMounted(async () => {
     <div class="topline">
       <div>
         <h2>My Badges</h2>
-        <p>Earned by passing each milestone quiz — quizzes aren't wired up yet, so these stay locked for now.</p>
+        <p>Earned by passing each milestone quiz.</p>
       </div>
     </div>
     <div class="badge-grid">

@@ -3,12 +3,15 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
+import { loadTrackData, reachedMilestones, hasPassed } from '@/lib/quiz'
+import { notifyQuizUnlocked } from '@/lib/notifications'
 import type { Module } from '@/lib/database.types'
 
 // NOTE: this is a functional starting point, not the full spec. The demo (captain-lms-demo.html)
 // tracks real watch-time via the YouTube IFrame API and only marks a module complete once watched
 // progress hits 95%. Wiring that up here is the next step — for now this embeds the video and lets
 // the employee mark it complete manually, which is enough to prove the Supabase read/write path.
+// Once quiz-gated completion replaces this (per the quiz engine), this manual button goes away.
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -50,6 +53,11 @@ async function markComplete() {
   )
   completed.value = true
   saving.value = false
+
+  const { track, completions, attempts } = await loadTrackData(auth.profile.id, auth.profile.department)
+  for (const m of reachedMilestones(track, completions)) {
+    if (!hasPassed(m, attempts)) await notifyQuizUnlocked(auth.profile.id, m)
+  }
 }
 </script>
 
