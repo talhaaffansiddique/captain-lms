@@ -13,15 +13,35 @@ import type { Module } from '@/lib/database.types'
 // the employee mark it complete manually, which is enough to prove the Supabase read/write path.
 // Once quiz-gated completion replaces this (per the quiz engine), this manual button goes away.
 
+const CAPTION_LANGUAGES = [
+  { code: 'en', label: 'English' },
+  { code: 'es', label: 'Spanish' },
+  { code: 'fr', label: 'French' },
+  { code: 'hi', label: 'Hindi' },
+  { code: 'ur', label: 'Urdu' },
+]
+
 const route = useRoute()
 const auth = useAuthStore()
 const module_ = ref<Module | null>(null)
 const completed = ref(false)
 const saving = ref(false)
+const ccOn = ref(false)
+const ccLang = ref('en')
 
-const embedUrl = computed(() =>
-  module_.value?.youtube_id ? `https://www.youtube.com/embed/${module_.value.youtube_id}` : null,
-)
+// Uses YouTube's own auto-generated captions via the embed's cc_load_policy param — no separate
+// caption files or transcription service needed. Toggling reloads the iframe (YouTube doesn't
+// expose a captions-only postMessage toggle without loading their full IFrame Player API).
+const embedUrl = computed(() => {
+  if (!module_.value?.youtube_id) return null
+  const params = new URLSearchParams()
+  if (ccOn.value) {
+    params.set('cc_load_policy', '1')
+    params.set('cc_lang_pref', ccLang.value)
+  }
+  const query = params.toString()
+  return `https://www.youtube.com/embed/${module_.value.youtube_id}${query ? `?${query}` : ''}`
+})
 
 onMounted(async () => {
   const id = Number(route.params.id)
@@ -75,6 +95,15 @@ async function markComplete() {
         <iframe :src="embedUrl" style="width: 100%; height: 100%; border: 0" allowfullscreen />
       </div>
       <div v-else class="video-box video-placeholder">▶ No video attached yet</div>
+
+      <div v-if="embedUrl" style="margin-top: 10px; display: flex; align-items: center; gap: 8px">
+        <button class="btn btn-ghost btn-sm" :class="{ 'btn-primary': ccOn }" title="Toggle captions" @click="ccOn = !ccOn">
+          CC {{ ccOn ? 'on' : 'off' }}
+        </button>
+        <select v-if="ccOn" v-model="ccLang" style="width: auto">
+          <option v-for="l in CAPTION_LANGUAGES" :key="l.code" :value="l.code">{{ l.label }}</option>
+        </select>
+      </div>
 
       <div style="margin-top: 16px; display: flex; align-items: center; gap: 12px">
         <button v-if="!completed" class="btn btn-primary" :disabled="saving" @click="markComplete">

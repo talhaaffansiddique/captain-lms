@@ -12,6 +12,16 @@ const activity = ref<ActivityLogEntry[]>([])
 const announcementText = ref('')
 const postingAnnouncement = ref(false)
 
+interface DeptSummary {
+  department: string
+  completions: number
+  quizPasses: number
+  overdue: { name: string; dueDate: string }[]
+}
+const digestSummaries = ref<DeptSummary[] | null>(null)
+const loadingDigest = ref(false)
+const digestError = ref('')
+
 async function load() {
   const [{ count: ec }, { count: mc }, { data: act }] = await Promise.all([
     supabase.from('profiles').select('*', { count: 'exact', head: true }),
@@ -33,6 +43,25 @@ async function postAnnouncement() {
   announcementText.value = ''
   postingAnnouncement.value = false
   await load()
+}
+
+async function previewDigest() {
+  loadingDigest.value = true
+  digestError.value = ''
+  digestSummaries.value = null
+  const { data: sessionData } = await supabase.auth.getSession()
+  const token = sessionData.session?.access_token
+  try {
+    const res = await fetch('/.netlify/functions/weekly-digest-preview', {
+      headers: { authorization: `Bearer ${token}` },
+    })
+    const body = await res.json()
+    if (!res.ok) digestError.value = body.error ?? 'Could not load preview'
+    else digestSummaries.value = body.summaries
+  } catch {
+    digestError.value = 'Could not reach the preview service.'
+  }
+  loadingDigest.value = false
 }
 </script>
 
@@ -59,6 +88,29 @@ async function postAnnouncement() {
       <button class="btn btn-primary btn-sm" style="margin-top: 8px" :disabled="postingAnnouncement || !announcementText.trim()" @click="postAnnouncement">
         {{ postingAnnouncement ? 'Posting…' : 'Post announcement' }}
       </button>
+    </div>
+
+    <div class="card" style="padding: 18px; margin-bottom: 20px; max-width: 460px">
+      <div class="panel-title"><h3>Weekly digest</h3></div>
+      <p class="hint" style="margin-bottom: 8px">
+        A real digest emails automatically every Monday once Resend is configured — preview what it would say right now.
+      </p>
+      <button class="btn btn-ghost btn-sm" :disabled="loadingDigest" @click="previewDigest">
+        {{ loadingDigest ? 'Loading…' : 'Preview weekly digest' }}
+      </button>
+      <p v-if="digestError" class="hint" style="color: var(--danger); margin-top: 8px">{{ digestError }}</p>
+      <div v-if="digestSummaries" style="margin-top: 12px">
+        <div v-for="s in digestSummaries" :key="s.department" style="margin-bottom: 12px">
+          <div style="font-weight: 700">{{ s.department }}</div>
+          <div style="font-size: 13px; color: var(--ink-soft)">
+            ✅ {{ s.completions }} module completion(s) this week · 🎖️ {{ s.quizPasses }} quiz pass(es) this week
+          </div>
+          <div v-if="s.overdue.length" style="font-size: 13px; color: var(--danger)">
+            ⚠️ Overdue: {{ s.overdue.map((o) => `${o.name} (since ${o.dueDate})`).join(', ') }}
+          </div>
+          <div v-else style="font-size: 13px; color: var(--teal)">No one overdue</div>
+        </div>
+      </div>
     </div>
 
     <div class="card">
