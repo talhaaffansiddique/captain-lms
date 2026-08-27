@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
 import { logActivity } from '@/lib/activity'
 import { loadDepartments, addDepartment, deleteDepartment } from '@/lib/departments'
+import { uploadModuleMaterial } from '@/lib/materials'
 import { MIN_QUESTIONS_TO_PUBLISH } from '@/lib/quiz'
 import type { Module, Department } from '@/lib/database.types'
 
@@ -13,7 +14,10 @@ const questionCounts = ref<Record<number, number>>({})
 const title = ref('')
 const department = ref('')
 const youtubeId = ref('')
+const materialType = ref<'video' | 'document'>('video')
+const documentFile = ref<File | null>(null)
 const saving = ref(false)
+const createError = ref('')
 
 const departments = ref<Department[]>([])
 const newDepartment = ref('')
@@ -45,18 +49,55 @@ function isScheduledFuture(m: Module) {
   return !!m.scheduled_date && m.scheduled_date > today
 }
 
+function materialTypeLabel(m: Module) {
+  if (m.youtube_id) return '▶ Video'
+  if (m.document_url && m.document_type) return `📄 ${m.document_type.toUpperCase()}`
+  return '—'
+}
+
+function onDocumentSelected(e: Event) {
+  documentFile.value = (e.target as HTMLInputElement).files?.[0] ?? null
+}
+
 async function createDraft() {
   if (!title.value.trim()) return
+  if (materialType.value === 'document' && !documentFile.value) {
+    createError.value = 'Choose a file to upload, or switch to Video.'
+    return
+  }
+  createError.value = ''
   saving.value = true
-  await supabase.from('modules').insert({
-    title: title.value.trim(),
-    department: department.value,
-    youtube_id: youtubeId.value.trim() || null,
-    is_draft: true,
-    created_by: auth.profile?.id,
-  })
+
+  const { data: inserted, error: insertError } = await supabase
+    .from('modules')
+    .insert({
+      title: title.value.trim(),
+      department: department.value,
+      youtube_id: materialType.value === 'video' ? youtubeId.value.trim() || null : null,
+      is_draft: true,
+      created_by: auth.profile?.id,
+    })
+    .select()
+    .single()
+
+  if (insertError || !inserted) {
+    createError.value = insertError?.message ?? 'Could not create the module.'
+    saving.value = false
+    return
+  }
+
+  if (materialType.value === 'document' && documentFile.value) {
+    const { url, type, error } = await uploadModuleMaterial(inserted.id, documentFile.value)
+    if (error || !url || !type) {
+      createError.value = error ?? 'Module created, but the document upload failed — try uploading it from the module page.'
+    } else {
+      await supabase.from('modules').update({ document_url: url, document_type: type }).eq('id', inserted.id)
+    }
+  }
+
   title.value = ''
   youtubeId.value = ''
+  documentFile.value = null
   saving.value = false
   await loadModules()
 }
@@ -123,15 +164,35 @@ async function removeAudience(d: Department) {
       </p>
     </div>
 
-    <div class="card" style="padding: 18px; margin-bottom: 20px; max-width: 460px">
+    <div class="card" style="padding: 18px; margin-bottom: 20px; max-width: 620px">
       <div class="field">
         <label>Module title</label>
         <input v-model="title" type="text" placeholder="e.g. Handling Refund Requests" />
       </div>
-      <div class="field">
-        <label>YouTube video ID (optional)</label>
-        <input v-model="youtubeId" type="text" placeholder="e.g. dQw4w9WgXcQ" />
+
+      <label style="display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 6px">Learning material</label>
+      <div style="display: flex; gap: 16px; margin-bottom: 14px; flex-wrap: wrap">
+        <div style="flex: 1; min-width: 220px">
+          <label style="display: flex; align-items: center; gap: 6px; font-weight: 400; margin-bottom: 6px">
+            <input v-model="materialType" type="radio" value="video" style="margin: 0" />
+            Video (YouTube)
+          </label>
+          <input
+            v-model="youtubeId"
+            type="text"
+            placeholder="YouTube video ID — e.g. dQw4w9WgXcQ"
+            :disabled="materialType !== 'video'"
+          />
+        </div>
+        <div style="flex: 1; min-width: 220px">
+          <label style="display: flex; align-items: center; gap: 6px; font-weight: 400; margin-bottom: 6px">
+            <input v-model="materialType" type="radio" value="document" style="margin: 0" />
+            Document (PDF/PPTX/DOCX)
+          </label>
+          <input type="file" accept=".pdf,.pptx,.ppt,.docx,.doc" :disabled="materialType !== 'document'" @change="onDocumentSelected" />
+        </div>
       </div>
+
       <div class="field">
         <label>Audience</label>
         <select v-model="department">
@@ -142,6 +203,7 @@ async function removeAudience(d: Department) {
       <button class="btn btn-primary" :disabled="saving" @click="createDraft">
         {{ saving ? 'Saving…' : 'Save as draft' }}
       </button>
+      <p v-if="createError" class="hint" style="color: var(--danger); margin-top: 8px">{{ createError }}</p>
       <p class="hint">Open a module below to add its question bank — {{ MIN_QUESTIONS_TO_PUBLISH }} questions are required before it can be published.</p>
     </div>
 
@@ -150,6 +212,7 @@ async function removeAudience(d: Department) {
         <thead>
           <tr>
             <th>Title</th>
+            <th>Type</th>
             <th>Audience</th>
             <th>Status</th>
             <th></th>
@@ -160,6 +223,7 @@ async function removeAudience(d: Department) {
             <td style="font-weight: 600">
               <RouterLink :to="`/admin/modules/${m.id}`" style="text-decoration: none">{{ m.title }}</RouterLink>
             </td>
+            <td style="color: var(--ink-soft)">{{ materialTypeLabel(m) }}</td>
             <td><span class="pill pill-outline">{{ m.department }}</span></td>
             <td>
               <span :class="['pill', m.is_draft ? 'pill-danger' : isScheduledFuture(m) ? 'pill-outline' : 'pill-teal']">
