@@ -111,6 +111,14 @@ function togglePlayback() {
   else player.value.playVideo()
 }
 
+function restartVideo() {
+  if (!player.value) return
+  // Rewinding is always allowed — only skipping ahead is blocked — so this just jumps back to 0
+  // and resumes play; it doesn't touch maxWatched or the completion state already earned.
+  player.value.seekTo(0, true)
+  player.value.playVideo()
+}
+
 function startTimers() {
   stopTimers()
   pollTimer = setInterval(checkProgress, POLL_INTERVAL_MS)
@@ -217,7 +225,20 @@ watch([ccOn, ccLang], applyCaptions)
     </div>
 
     <div class="card" style="padding: 16px; max-width: 640px">
-      <div v-if="hasVideo" class="video-box"><div ref="playerEl" style="width: 100%; height: 100%" /></div>
+      <div v-if="hasVideo" class="video-box">
+        <div ref="playerEl" style="width: 100%; height: 100%" />
+        <!--
+          YouTube shows its own title/channel/share/"Watch on YouTube" overlay whenever the
+          embed is paused, and there's no player parameter that turns it off. This cover sits on
+          top of the iframe at all times so that overlay is never visible or clickable: fully
+          transparent (and still intercepting every click itself, so hover/click never reaches
+          YouTube's own chrome at all) while playing, and an opaque "tap to play" surface — our
+          own UI, not YouTube's — whenever paused.
+        -->
+        <div class="video-cover" :class="{ paused: !isPlaying }" @click="togglePlayback">
+          <span v-if="!isPlaying" class="video-cover-play">▶</span>
+        </div>
+      </div>
       <div v-else-if="hasDocument" class="video-box">
         <iframe
           :src="documentEmbedUrl(module_.document_url as string, module_.document_type as string)"
@@ -228,6 +249,7 @@ watch([ccOn, ccLang], applyCaptions)
 
       <div v-if="hasVideo" style="margin-top: 10px; display: flex; align-items: center; gap: 8px">
         <button class="btn btn-primary btn-sm" @click="togglePlayback">{{ isPlaying ? '⏸ Pause' : '▶ Play' }}</button>
+        <button class="btn btn-ghost btn-sm" @click="restartVideo">⟲ Start over</button>
         <button class="btn btn-ghost btn-sm" :class="{ 'btn-primary': ccOn }" title="Toggle captions" @click="ccOn = !ccOn">
           CC {{ ccOn ? 'on' : 'off' }}
         </button>
@@ -254,10 +276,33 @@ watch([ccOn, ccLang], applyCaptions)
 
 <style scoped>
 .video-box {
+  position: relative;
   aspect-ratio: 16 / 9;
   border-radius: 10px;
   overflow: hidden;
   background: linear-gradient(150deg, #1a1d2b, #0d0f18);
+}
+.video-cover {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+.video-cover.paused {
+  background: rgba(13, 15, 24, 0.88);
+}
+.video-cover-play {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: var(--brass);
+  color: #17203a;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
 }
 .video-placeholder {
   display: grid;
