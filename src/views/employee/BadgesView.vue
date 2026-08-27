@@ -30,15 +30,25 @@ onMounted(async () => {
     <div class="topline">
       <div>
         <h2>My Badges</h2>
-        <p>Earned by passing each milestone quiz.</p>
+        <p>Earned by passing each milestone quiz — click an unlocked badge to view its certificate.</p>
       </div>
     </div>
     <div class="badge-grid">
-      <div v-for="t in BADGE_TIERS" :key="t.m" :class="['card', 'badge-tile', { locked: !passedMilestones.has(t.m) }]">
-        <div class="badge-medal">{{ t.icon }}</div>
-        <div class="bname">{{ t.name }}</div>
-      </div>
-      <div :class="['card', 'badge-tile', { locked: !passedMilestones.has('final') }]">
+      <template v-for="t in BADGE_TIERS" :key="t.m">
+        <RouterLink v-if="passedMilestones.has(t.m)" :to="`/app/certificate/${t.m}`" class="card badge-tile" style="cursor: pointer">
+          <div class="badge-medal">{{ t.icon }}</div>
+          <div class="bname">{{ t.name }}</div>
+        </RouterLink>
+        <div v-else class="card badge-tile locked">
+          <div class="badge-medal">{{ t.icon }}</div>
+          <div class="bname">{{ t.name }}</div>
+        </div>
+      </template>
+      <RouterLink v-if="passedMilestones.has('final')" to="/app/certificate/final" class="card badge-tile" style="cursor: pointer">
+        <div class="badge-medal">🏆</div>
+        <div class="bname">Captain Master</div>
+      </RouterLink>
+      <div v-else class="card badge-tile locked">
         <div class="badge-medal">🏆</div>
         <div class="bname">Captain Master</div>
       </div>

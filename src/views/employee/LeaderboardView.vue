@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
 
@@ -10,17 +10,42 @@ interface Row {
   completed: number
 }
 
+type Period = 'all' | 'week' | 'month'
+
+const DEPARTMENTS = ['All', 'General', 'Sales', 'Engineering', 'Finance', 'Operations', 'Marketing', 'Customer Support']
+
 const auth = useAuthStore()
-const rows = ref<Row[]>([])
+const profiles = ref<{ id: string; full_name: string; department: string }[]>([])
+const completions = ref<{ user_id: string; completed_at: string | null }[]>([])
+const period = ref<Period>('all')
+const department = ref('All')
 
 onMounted(async () => {
-  const { data: profiles } = await supabase.from('profiles').select('id, full_name, department')
-  const { data: completions } = await supabase.from('video_completions').select('user_id').eq('completed', true)
+  const [{ data: p }, { data: c }] = await Promise.all([
+    supabase.from('profiles').select('id, full_name, department'),
+    supabase.from('video_completions').select('user_id, completed_at').eq('completed', true),
+  ])
+  profiles.value = p ?? []
+  completions.value = c ?? []
+})
 
+function periodCutoff(p: Period): Date | null {
+  if (p === 'all') return null
+  const d = new Date()
+  if (p === 'week') d.setDate(d.getDate() - 7)
+  else d.setMonth(d.getMonth() - 1)
+  return d
+}
+
+const rows = computed<Row[]>(() => {
+  const cutoff = periodCutoff(period.value)
   const counts: Record<string, number> = {}
-  for (const c of completions ?? []) counts[c.user_id] = (counts[c.user_id] ?? 0) + 1
-
-  rows.value = (profiles ?? [])
+  for (const c of completions.value) {
+    if (cutoff && (!c.completed_at || new Date(c.completed_at) < cutoff)) continue
+    counts[c.user_id] = (counts[c.user_id] ?? 0) + 1
+  }
+  return profiles.value
+    .filter((p) => department.value === 'All' || p.department === department.value)
     .map((p) => ({ id: p.id, full_name: p.full_name, department: p.department, completed: counts[p.id] ?? 0 }))
     .sort((a, b) => b.completed - a.completed)
 })
@@ -34,6 +59,18 @@ onMounted(async () => {
         <p>Ranked by modules completed.</p>
       </div>
     </div>
+
+    <div style="display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap">
+      <select v-model="period" style="width: auto">
+        <option value="all">All-time</option>
+        <option value="week">This week</option>
+        <option value="month">This month</option>
+      </select>
+      <select v-model="department" style="width: auto">
+        <option v-for="d in DEPARTMENTS" :key="d" :value="d">{{ d }}</option>
+      </select>
+    </div>
+
     <div class="card">
       <div
         v-for="(r, i) in rows"
@@ -51,6 +88,7 @@ onMounted(async () => {
         </div>
         <div class="lb-score">{{ r.completed }}</div>
       </div>
+      <p v-if="!rows.length" style="padding: 24px; text-align: center; color: var(--ink-soft)">No one matches this filter yet.</p>
     </div>
   </div>
 </template>

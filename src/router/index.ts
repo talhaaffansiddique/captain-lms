@@ -43,6 +43,11 @@ const router = createRouter({
           component: () => import('@/views/employee/BadgesView.vue'),
         },
         {
+          path: 'certificate/:milestone',
+          name: 'employee-certificate',
+          component: () => import('@/views/employee/CertificateView.vue'),
+        },
+        {
           path: 'leaderboard',
           name: 'employee-leaderboard',
           component: () => import('@/views/employee/LeaderboardView.vue'),
@@ -69,6 +74,11 @@ const router = createRouter({
           path: 'employees',
           name: 'admin-employees',
           component: () => import('@/views/admin/EmployeesView.vue'),
+        },
+        {
+          path: 'employees/:id',
+          name: 'admin-employee-detail',
+          component: () => import('@/views/admin/EmployeeDetailView.vue'),
         },
         {
           path: 'modules',

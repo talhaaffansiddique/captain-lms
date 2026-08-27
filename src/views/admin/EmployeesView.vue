@@ -27,11 +27,13 @@ onMounted(async () => {
         </thead>
         <tbody>
           <tr v-for="e in employees" :key="e.id">
-            <td style="font-weight: 600; display: flex; align-items: center; gap: 10px">
-              <div class="avatar" style="width: 26px; height: 26px; font-size: 11px">
-                {{ e.full_name.slice(0, 2).toUpperCase() }}
-              </div>
-              {{ e.full_name }}
+            <td style="font-weight: 600">
+              <RouterLink :to="`/admin/employees/${e.id}`" style="display: flex; align-items: center; gap: 10px; text-decoration: none">
+                <div class="avatar" style="width: 26px; height: 26px; font-size: 11px">
+                  {{ e.full_name.slice(0, 2).toUpperCase() }}
+                </div>
+                {{ e.full_name }}
+              </RouterLink>
             </td>
             <td>{{ e.department }}</td>
             <td><span class="pill pill-outline">{{ e.role }}</span></td>
