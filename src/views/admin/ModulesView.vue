@@ -2,18 +2,23 @@
 import { ref, onMounted } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
+import { logActivity } from '@/lib/activity'
+import { loadDepartments, addDepartment, deleteDepartment } from '@/lib/departments'
 import { MIN_QUESTIONS_TO_PUBLISH } from '@/lib/quiz'
-import type { Module } from '@/lib/database.types'
-
-const DEPARTMENTS = ['General', 'Sales', 'Engineering', 'Finance', 'Operations', 'Marketing', 'Customer Support']
+import type { Module, Department } from '@/lib/database.types'
 
 const auth = useAuthStore()
 const modules = ref<Module[]>([])
 const questionCounts = ref<Record<number, number>>({})
 const title = ref('')
-const department = ref('General')
+const department = ref('')
 const youtubeId = ref('')
 const saving = ref(false)
+
+const departments = ref<Department[]>([])
+const newDepartment = ref('')
+const savingDepartment = ref(false)
+const departmentError = ref('')
 
 async function loadModules() {
   const [{ data: modData }, { data: qData }] = await Promise.all([
@@ -26,7 +31,14 @@ async function loadModules() {
   questionCounts.value = counts
 }
 
-onMounted(loadModules)
+async function refreshDepartments() {
+  departments.value = await loadDepartments()
+  if (!department.value) department.value = 'General'
+}
+
+onMounted(async () => {
+  await Promise.all([loadModules(), refreshDepartments()])
+})
 
 const today = new Date().toISOString().slice(0, 10)
 function isScheduledFuture(m: Module) {
@@ -48,12 +60,67 @@ async function createDraft() {
   saving.value = false
   await loadModules()
 }
+
+async function createAudience() {
+  departmentError.value = ''
+  savingDepartment.value = true
+  const { error } = await addDepartment(newDepartment.value)
+  if (error) {
+    departmentError.value = error
+  } else {
+    await logActivity(auth.profile?.id, `Added "${newDepartment.value.trim()}" as a company audience`)
+    newDepartment.value = ''
+    await refreshDepartments()
+  }
+  savingDepartment.value = false
+}
+
+async function removeAudience(d: Department) {
+  const { error } = await deleteDepartment(d.id)
+  if (error) {
+    departmentError.value = error
+    return
+  }
+  await logActivity(auth.profile?.id, `Removed "${d.name}" from company audiences`)
+  await refreshDepartments()
+}
 </script>
 
 <template>
   <div>
     <div class="topline">
       <div><h2>Modules</h2></div>
+    </div>
+
+    <div class="card" style="padding: 18px; margin-bottom: 20px; max-width: 460px">
+      <div class="panel-title"><h3>Audiences</h3></div>
+      <p class="hint" style="margin-bottom: 8px">
+        Departments employees can belong to and modules can target. "General" is always available and means everyone.
+      </p>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px">
+        <span class="pill pill-outline">General</span>
+        <span v-for="d in departments" :key="d.id" class="pill pill-outline" style="display: inline-flex; align-items: center; gap: 6px">
+          {{ d.name }}
+          <button
+            style="background: none; border: none; cursor: pointer; color: var(--danger); font-weight: 700; line-height: 1; padding: 0"
+            title="Remove"
+            @click="removeAudience(d)"
+          >
+            ×
+          </button>
+        </span>
+      </div>
+      <div style="display: flex; gap: 8px">
+        <input v-model="newDepartment" type="text" placeholder="e.g. Legal" style="flex: 1" />
+        <button class="btn btn-ghost btn-sm" :disabled="savingDepartment || !newDepartment.trim()" @click="createAudience">
+          {{ savingDepartment ? 'Adding…' : 'Add' }}
+        </button>
+      </div>
+      <p v-if="departmentError" class="hint" style="color: var(--danger); margin-top: 6px">{{ departmentError }}</p>
+      <p class="hint" style="margin-top: 6px">
+        Removing an audience only stops it appearing in future dropdowns — anyone already assigned to it, or any module
+        already targeting it, is unaffected.
+      </p>
     </div>
 
     <div class="card" style="padding: 18px; margin-bottom: 20px; max-width: 460px">
@@ -68,7 +135,8 @@ async function createDraft() {
       <div class="field">
         <label>Audience</label>
         <select v-model="department">
-          <option v-for="d in DEPARTMENTS" :key="d" :value="d">{{ d }}</option>
+          <option value="General">General</option>
+          <option v-for="d in departments" :key="d.id" :value="d.name">{{ d.name }}</option>
         </select>
       </div>
       <button class="btn btn-primary" :disabled="saving" @click="createDraft">
@@ -89,7 +157,9 @@ async function createDraft() {
         </thead>
         <tbody>
           <tr v-for="m in modules" :key="m.id">
-            <td style="font-weight: 600">{{ m.title }}</td>
+            <td style="font-weight: 600">
+              <RouterLink :to="`/admin/modules/${m.id}`" style="text-decoration: none">{{ m.title }}</RouterLink>
+            </td>
             <td><span class="pill pill-outline">{{ m.department }}</span></td>
             <td>
               <span :class="['pill', m.is_draft ? 'pill-danger' : isScheduledFuture(m) ? 'pill-outline' : 'pill-teal']">
@@ -102,7 +172,7 @@ async function createDraft() {
                 }}
               </span>
             </td>
-            <td><RouterLink class="btn btn-ghost btn-sm" :to="`/admin/modules/${m.id}`">Manage questions</RouterLink></td>
+            <td><RouterLink class="btn btn-ghost btn-sm" :to="`/admin/modules/${m.id}`">Open</RouterLink></td>
           </tr>
         </tbody>
       </table>

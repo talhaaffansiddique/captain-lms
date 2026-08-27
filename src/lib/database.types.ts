@@ -88,6 +88,12 @@ export interface ActivityLogEntry {
   created_at: string
 }
 
+export interface Department {
+  id: number
+  name: string
+  created_at: string
+}
+
 // Minimal shape Supabase's client generic needs — table name -> Row type.
 export interface Database {
   public: {
@@ -125,6 +131,7 @@ export interface Database {
         Insert: Partial<ActivityLogEntry>
         Update: Partial<ActivityLogEntry>
       }
+      departments: { Row: Department; Insert: Partial<Department>; Update: Partial<Department> }
     }
   }
 }

@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
+import { loadDepartments } from '@/lib/departments'
 
 interface Row {
   id: string
@@ -12,21 +13,22 @@ interface Row {
 
 type Period = 'all' | 'week' | 'month'
 
-const DEPARTMENTS = ['All', 'General', 'Sales', 'Engineering', 'Finance', 'Operations', 'Marketing', 'Customer Support']
-
 const auth = useAuthStore()
+const departmentOptions = ref<string[]>(['All', 'General'])
 const profiles = ref<{ id: string; full_name: string; department: string }[]>([])
 const completions = ref<{ user_id: string; completed_at: string | null }[]>([])
 const period = ref<Period>('all')
 const department = ref('All')
 
 onMounted(async () => {
-  const [{ data: p }, { data: c }] = await Promise.all([
+  const [{ data: p }, { data: c }, depts] = await Promise.all([
     supabase.from('profiles').select('id, full_name, department'),
     supabase.from('video_completions').select('user_id, completed_at').eq('completed', true),
+    loadDepartments(),
   ])
   profiles.value = p ?? []
   completions.value = c ?? []
+  departmentOptions.value = ['All', 'General', ...depts.map((d) => d.name)]
 })
 
 function periodCutoff(p: Period): Date | null {
@@ -67,7 +69,7 @@ const rows = computed<Row[]>(() => {
         <option value="month">This month</option>
       </select>
       <select v-model="department" style="width: auto">
-        <option v-for="d in DEPARTMENTS" :key="d" :value="d">{{ d }}</option>
+        <option v-for="d in departmentOptions" :key="d" :value="d">{{ d }}</option>
       </select>
     </div>
 

@@ -1,22 +1,27 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { supabaseConfigured } from '@/lib/supabase'
+import { loadDepartments } from '@/lib/departments'
 import ThemeToggle from '@/components/ThemeToggle.vue'
-
-const DEPARTMENTS = ['Sales', 'Engineering', 'Finance', 'Operations', 'Marketing', 'Customer Support']
 
 const router = useRouter()
 const auth = useAuthStore()
 
+const departments = ref<string[]>([])
 const mode = ref<'signin' | 'signup'>('signin')
 const email = ref('')
 const password = ref('')
 const fullName = ref('')
-const department = ref(DEPARTMENTS[0] ?? 'Sales')
+const department = ref('')
 const error = ref('')
 const busy = ref(false)
+
+onMounted(async () => {
+  departments.value = (await loadDepartments()).map((d) => d.name)
+  department.value = departments.value[0] ?? ''
+})
 
 async function submit() {
   error.value = ''
@@ -83,7 +88,7 @@ async function submit() {
           <div v-if="mode === 'signup'" class="field">
             <label>Department</label>
             <select v-model="department">
-              <option v-for="d in DEPARTMENTS" :key="d" :value="d">{{ d }}</option>
+              <option v-for="d in departments" :key="d" :value="d">{{ d }}</option>
             </select>
           </div>
 

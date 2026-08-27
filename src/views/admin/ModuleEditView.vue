@@ -4,8 +4,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
 import { logActivity } from '@/lib/activity'
+import { loadDepartments } from '@/lib/departments'
 import { MIN_QUESTIONS_TO_PUBLISH, parseBulkQuestions } from '@/lib/quiz'
-import type { Module, QuizQuestion } from '@/lib/database.types'
+import type { Module, QuizQuestion, Department } from '@/lib/database.types'
 
 const route = useRoute()
 const router = useRouter()
@@ -15,6 +16,12 @@ const moduleId = Number(route.params.id)
 const module_ = ref<Module | null>(null)
 const questions = ref<QuizQuestion[]>([])
 const loading = ref(true)
+
+const departments = ref<Department[]>([])
+const detailTitle = ref('')
+const detailDepartment = ref('')
+const detailYoutubeId = ref('')
+const savingDetails = ref(false)
 
 const newQuestion = ref('')
 const newOptions = ref(['', '', '', ''])
@@ -37,17 +44,38 @@ const savingEdit = ref(false)
 
 async function load() {
   loading.value = true
-  const [{ data: mod }, { data: qs }] = await Promise.all([
+  const [{ data: mod }, { data: qs }, depts] = await Promise.all([
     supabase.from('modules').select('*').eq('id', moduleId).single(),
     supabase.from('quiz_questions').select('*').eq('module_id', moduleId).order('id'),
+    loadDepartments(),
   ])
   module_.value = mod
   questions.value = qs ?? []
   scheduledDate.value = mod?.scheduled_date ?? ''
+  departments.value = depts
+  detailTitle.value = mod?.title ?? ''
+  detailDepartment.value = mod?.department ?? 'General'
+  detailYoutubeId.value = mod?.youtube_id ?? ''
   loading.value = false
 }
 
 onMounted(load)
+
+async function saveDetails() {
+  if (!detailTitle.value.trim()) return
+  savingDetails.value = true
+  await supabase
+    .from('modules')
+    .update({
+      title: detailTitle.value.trim(),
+      department: detailDepartment.value,
+      youtube_id: detailYoutubeId.value.trim() || null,
+    })
+    .eq('id', moduleId)
+  await logActivity(auth.profile?.id, `Updated details for "${detailTitle.value.trim()}"`)
+  savingDetails.value = false
+  await load()
+}
 
 const canPublish = computed(() => questions.value.length >= MIN_QUESTIONS_TO_PUBLISH)
 const isScheduledFuture = computed(
@@ -189,6 +217,42 @@ async function saveSchedule() {
       }}
     </span>
 
+    <div class="card" style="padding: 16px; margin-bottom: 20px; max-width: 640px">
+      <div v-if="module_.youtube_id" class="video-box">
+        <iframe
+          :src="`https://www.youtube.com/embed/${module_.youtube_id}`"
+          style="width: 100%; height: 100%; border: 0"
+          allowfullscreen
+        />
+      </div>
+      <div v-else class="video-box video-placeholder">▶ No video attached yet</div>
+    </div>
+
+    <div class="card" style="padding: 18px; margin-bottom: 20px; max-width: 420px">
+      <div class="panel-title"><h3>Module details</h3></div>
+      <div class="field">
+        <label>Title</label>
+        <input v-model="detailTitle" type="text" />
+      </div>
+      <div class="field">
+        <label>YouTube video ID</label>
+        <input v-model="detailYoutubeId" type="text" placeholder="e.g. dQw4w9WgXcQ" />
+      </div>
+      <div class="field">
+        <label>Audience</label>
+        <select v-model="detailDepartment">
+          <option value="General">General</option>
+          <option v-for="d in departments" :key="d.id" :value="d.name">{{ d.name }}</option>
+        </select>
+      </div>
+      <button class="btn btn-ghost btn-sm" :disabled="savingDetails" @click="saveDetails">
+        {{ savingDetails ? 'Saving…' : 'Save details' }}
+      </button>
+      <p class="hint" style="margin-top: 10px">
+        Created {{ new Date(module_.created_at).toLocaleDateString() }} · {{ questions.length }} question(s) in bank
+      </p>
+    </div>
+
     <div class="card" style="padding: 18px; margin-bottom: 20px; max-width: 360px">
       <div class="panel-title"><h3>Publish schedule</h3></div>
       <p class="hint" style="margin-bottom: 8px">
@@ -281,3 +345,18 @@ async function saveSchedule() {
     </div>
   </div>
 </template>
+
+<style scoped>
+.video-box {
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+  background: linear-gradient(150deg, #1a1d2b, #0d0f18);
+}
+.video-placeholder {
+  display: grid;
+  place-items: center;
+  color: #cfd3e6;
+  font-size: 13px;
+}
+</style>

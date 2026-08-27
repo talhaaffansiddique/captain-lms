@@ -89,6 +89,14 @@ create table if not exists announcements (
   created_at timestamptz not null default now()
 );
 
+-- ---------- departments (editable list of company departments — "General" is a reserved
+-- built-in audience for company-wide modules and is never stored here) ----------
+create table if not exists departments (
+  id bigint generated always as identity primary key,
+  name text not null unique,
+  created_at timestamptz not null default now()
+);
+
 -- ---------- activity_log (admin audit trail) ----------
 create table if not exists activity_log (
   id bigint generated always as identity primary key,
@@ -109,6 +117,7 @@ alter table quiz_attempts enable row level security;
 alter table quiz_attempt_grants enable row level security;
 alter table notifications enable row level security;
 alter table announcements enable row level security;
+alter table departments enable row level security;
 alter table activity_log enable row level security;
 
 -- profiles: everyone can read profiles (needed for leaderboard/team views); users can edit their
@@ -178,6 +187,15 @@ create policy "admins post announcements" on announcements
     exists (select 1 from profiles where id = auth.uid() and role = 'admin')
   );
 
+-- departments: readable by everyone (including signed-out visitors, for the signup dropdown);
+-- only admins can add/remove entries.
+create policy "departments are publicly readable" on departments
+  for select using (true);
+create policy "admins manage departments" on departments
+  for all using (
+    exists (select 1 from profiles where id = auth.uid() and role = 'admin')
+  );
+
 create policy "admins read activity log" on activity_log
   for select using (
     exists (select 1 from profiles where id = auth.uid() and role = 'admin')
@@ -206,3 +224,8 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- ---------- starter departments (safe to re-run — duplicates are skipped) ----------
+insert into departments (name) values
+  ('Sales'), ('Engineering'), ('Finance'), ('Operations'), ('Marketing'), ('Customer Support')
+on conflict (name) do nothing;
