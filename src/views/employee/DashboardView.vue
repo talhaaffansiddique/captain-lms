@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
 import { loadTrackData, pendingMilestones, milestoneLabel, type Milestone } from '@/lib/quiz'
+import { materialType, formatDuration } from '@/lib/materials'
 import type { Module, VideoCompletion, Announcement } from '@/lib/database.types'
 
 const auth = useAuthStore()
@@ -102,7 +103,7 @@ const isOverdue = computed(() => {
           <div class="row-info">
             <div class="t">{{ m.title }}</div>
             <div class="m">
-              {{ m.department }} · {{ isDone(m.id) ? 'Completed' : 'Not started' }}
+              {{ m.department }} · {{ materialType(m) }} · {{ formatDuration(m) }} · {{ isDone(m.id) ? 'Completed' : 'Not started' }}
             </div>
           </div>
         </RouterLink>

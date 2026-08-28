@@ -23,10 +23,12 @@ const CAPTION_LANGUAGES = [
   { code: 'ur', label: 'Urdu' },
 ]
 
-const SEEK_TOLERANCE_SECONDS = 2
+// Tight enough to catch a skip within well under a second, loose enough that normal playback
+// between polls (and the postMessage round-trip to the YouTube iframe) never false-triggers it.
+const SEEK_TOLERANCE_SECONDS = 0.75
 const COMPLETE_THRESHOLD = 0.95
 const SAVE_INTERVAL_MS = 5000
-const POLL_INTERVAL_MS = 500
+const POLL_INTERVAL_MS = 200
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -97,12 +99,25 @@ function initPlayer() {
         if (maxWatched.value > 0) e.target.seekTo(maxWatched.value, true)
         applyCaptions()
         startTimers()
+        void cacheRealDuration()
       },
       onStateChange: (e) => {
         isPlaying.value = e.data === 1 // YT.PlayerState.PLAYING
       },
     },
   })
+}
+
+// YouTube knows the real video length; the DB only has a 300s placeholder until someone actually
+// plays it once. Cache the real value back so it shows correctly anywhere modules are listed.
+async function cacheRealDuration() {
+  if (!module_.value || duration.value <= 0) return
+  const real = Math.round(duration.value)
+  if (Math.abs(real - module_.value.duration_seconds) < 3) return
+  // A narrow RPC rather than a direct table update — employees have no general write access to
+  // modules, and this function only ever touches duration_seconds.
+  await supabase.rpc('cache_module_duration', { p_module_id: module_.value.id, p_seconds: real })
+  module_.value.duration_seconds = real
 }
 
 function togglePlayback() {

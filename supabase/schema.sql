@@ -241,6 +241,21 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
 
+-- ---------- narrow RPC letting any employee cache a video's real duration ----------
+-- YouTube knows the real length; the DB only has a 300s placeholder until someone actually plays
+-- it. Rather than granting employees broad UPDATE access on modules, this function only ever
+-- touches duration_seconds on the one row given.
+create or replace function public.cache_module_duration(p_module_id bigint, p_seconds int)
+returns void as $$
+begin
+  if p_seconds > 0 then
+    update modules set duration_seconds = p_seconds where id = p_module_id;
+  end if;
+end;
+$$ language plpgsql security definer;
+
+grant execute on function public.cache_module_duration(bigint, int) to authenticated;
+
 -- ---------- starter departments (safe to re-run — duplicates are skipped) ----------
 insert into departments (name) values
   ('Sales'), ('Engineering'), ('Finance'), ('Operations'), ('Marketing'), ('Customer Support')

@@ -36,3 +36,24 @@ export function documentEmbedUrl(url: string, type: string): string {
   if (type === 'pdf') return url
   return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`
 }
+
+interface MaterialModule {
+  youtube_id: string | null
+  document_type: string | null
+}
+
+/** Plain-text learning-material type, for any list of modules — "Video", a document extension
+ * like "PDF", or "None" if nothing's attached yet. */
+export function materialType(m: MaterialModule): string {
+  if (m.youtube_id) return 'Video'
+  if (m.document_type) return m.document_type.toUpperCase()
+  return 'None'
+}
+
+/** Minutes for a video (the real length once someone's played it at least once — a fresh video
+ * shows a 5-minute placeholder until then), "Untimed" for a document, or "—" for neither. */
+export function formatDuration(m: MaterialModule & { duration_seconds: number }): string {
+  if (!m.youtube_id) return m.document_type ? 'Untimed' : '—'
+  const mins = Math.round(m.duration_seconds / 60)
+  return mins < 1 ? '<1 min' : `${mins} min`
+}

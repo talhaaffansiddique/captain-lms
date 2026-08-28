@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
+import { materialType, formatDuration } from '@/lib/materials'
 import type { Module, VideoCompletion } from '@/lib/database.types'
 
 const auth = useAuthStore()
@@ -44,7 +45,7 @@ function isDone(moduleId: number) {
         <div class="row-num">{{ isDone(m.id) ? '✓' : m.id }}</div>
         <div class="row-info">
           <div class="t">{{ m.title }} <span class="pill pill-outline">{{ m.department }}</span></div>
-          <div class="m">{{ Math.round(m.duration_seconds / 60) }} min · {{ isDone(m.id) ? 'Completed' : 'Not started' }}</div>
+          <div class="m">{{ materialType(m) }} · {{ formatDuration(m) }} · {{ isDone(m.id) ? 'Completed' : 'Not started' }}</div>
         </div>
       </RouterLink>
       <p v-if="!modules.length" style="padding: 24px; text-align: center; color: var(--ink-soft)">

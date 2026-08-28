@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
 import { logActivity } from '@/lib/activity'
 import { loadDepartments, addDepartment, deleteDepartment } from '@/lib/departments'
-import { uploadModuleMaterial } from '@/lib/materials'
+import { uploadModuleMaterial, formatDuration } from '@/lib/materials'
 import { MIN_QUESTIONS_TO_PUBLISH } from '@/lib/quiz'
 import type { Module, Department } from '@/lib/database.types'
 
@@ -222,6 +222,7 @@ async function removeAudience(d: Department) {
           <tr>
             <th>Title</th>
             <th>Type</th>
+            <th>Duration</th>
             <th>Audience</th>
             <th>Status</th>
             <th></th>
@@ -233,6 +234,7 @@ async function removeAudience(d: Department) {
               <RouterLink :to="`/admin/modules/${m.id}`" style="text-decoration: none">{{ m.title }}</RouterLink>
             </td>
             <td style="color: var(--ink-soft)">{{ materialTypeLabel(m) }}</td>
+            <td style="color: var(--ink-soft)">{{ formatDuration(m) }}</td>
             <td><span class="pill pill-outline">{{ m.department }}</span></td>
             <td>
               <span :class="['pill', m.is_draft ? 'pill-danger' : isScheduledFuture(m) ? 'pill-outline' : 'pill-teal']">
