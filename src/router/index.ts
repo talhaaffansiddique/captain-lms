@@ -81,6 +81,11 @@ const router = createRouter({
           component: () => import('@/views/admin/EmployeeDetailView.vue'),
         },
         {
+          path: 'audiences',
+          name: 'admin-audiences',
+          component: () => import('@/views/admin/AudiencesView.vue'),
+        },
+        {
           path: 'modules',
           name: 'admin-modules',
           component: () => import('@/views/admin/ModulesView.vue'),

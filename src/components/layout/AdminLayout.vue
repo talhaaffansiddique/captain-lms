@@ -16,6 +16,7 @@ const links = [
   { to: '/admin/overview', label: 'Overview', short: 'Overview', icon: '■' },
   { to: '/admin/employees', label: 'Employees', short: 'People', icon: '👥' },
   { to: '/admin/modules', label: 'Modules', short: 'Modules', icon: '▤' },
+  { to: '/admin/audiences', label: 'Audiences', short: 'Audiences', icon: '🏷️' },
 ]
 </script>
 
