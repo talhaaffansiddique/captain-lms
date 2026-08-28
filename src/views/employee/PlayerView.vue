@@ -224,7 +224,7 @@ watch([ccOn, ccLang], applyCaptions)
       </div>
     </div>
 
-    <div class="card" style="padding: 16px; max-width: 640px">
+    <div class="card" style="padding: 16px" :style="{ maxWidth: hasDocument ? '100%' : '640px' }">
       <div v-if="hasVideo" class="video-box">
         <div ref="playerEl" style="width: 100%; height: 100%" />
         <!--
@@ -239,7 +239,13 @@ watch([ccOn, ccLang], applyCaptions)
           <span v-if="!isPlaying" class="video-cover-play">▶</span>
         </div>
       </div>
-      <div v-else-if="hasDocument" class="video-box">
+      <!--
+        Documents don't fit a fixed 16:9 box the way video does — a PPTX/PDF page is often closer
+        to 4:3 or portrait, and Office Online Viewer / the browser's own PDF viewer both want real
+        screen space to be readable. This scales with the viewport instead, so it's not a tiny
+        letterboxed rectangle on a large monitor.
+      -->
+      <div v-else-if="hasDocument" class="document-box">
         <iframe
           :src="documentEmbedUrl(module_.document_url as string, module_.document_type as string)"
           style="width: 100%; height: 100%; border: 0"
@@ -309,6 +315,19 @@ watch([ccOn, ccLang], applyCaptions)
   place-items: center;
   color: #cfd3e6;
   font-size: 13px;
+}
+.document-box {
+  width: 100%;
+  height: min(85vh, 1100px);
+  min-height: 420px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: linear-gradient(150deg, #1a1d2b, #0d0f18);
+}
+@media (max-width: 760px) {
+  .document-box {
+    height: 70vh;
+  }
 }
 .progress {
   height: 6px;

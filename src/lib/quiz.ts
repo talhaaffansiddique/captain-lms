@@ -37,6 +37,12 @@ export function generalModules(track: Module[]): Module[] {
   return track.filter((m) => m.department === 'General')
 }
 
+/** General modules the admin has actually opted into having a quiz — some General modules (e.g.
+ * a purely informational policy video) can skip the quiz entirely. */
+export function quizzedGeneralModules(track: Module[]): Module[] {
+  return generalModules(track).filter((m) => m.quiz_required)
+}
+
 export function departmentModules(track: Module[]): Module[] {
   return track.filter((m) => m.department !== 'General')
 }
@@ -53,10 +59,10 @@ export function moduleChunkForMilestone(track: Module[], milestone: Milestone): 
   return departmentModules(track).slice(idx * QUESTIONS_PER_QUIZ, (idx + 1) * QUESTIONS_PER_QUIZ)
 }
 
-/** Every milestone that could ever apply to this track, reached or not — one per General
- * module, up to 5 numbered department milestones, plus the Final Assessment. */
+/** Every milestone that could ever apply to this track, reached or not — one per quiz-required
+ * General module, up to 5 numbered department milestones, plus the Final Assessment. */
 export function allMilestonesForTrack(track: Module[]): Milestone[] {
-  return [...generalModules(track).map((m) => generalMilestoneId(m.id)), ...NUMBERED_MILESTONES, 'final']
+  return [...quizzedGeneralModules(track).map((m) => generalMilestoneId(m.id)), ...NUMBERED_MILESTONES, 'final']
 }
 
 /** Milestones whose feeding chunk is fully watched — eligible to attempt, regardless of pass/fail state. */
@@ -64,7 +70,7 @@ export function reachedMilestones(track: Module[], completions: VideoCompletion[
   const doneIds = new Set(completions.filter((c) => c.completed).map((c) => c.module_id))
   const reached: Milestone[] = []
 
-  for (const gm of generalModules(track)) {
+  for (const gm of quizzedGeneralModules(track)) {
     if (doneIds.has(gm.id)) reached.push(generalMilestoneId(gm.id))
   }
 

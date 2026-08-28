@@ -16,6 +16,7 @@ const department = ref('')
 const youtubeId = ref('')
 const materialType = ref<'video' | 'document'>('video')
 const documentFile = ref<File | null>(null)
+const quizRequired = ref(true)
 const saving = ref(false)
 const createError = ref('')
 
@@ -74,6 +75,7 @@ async function createDraft() {
       title: title.value.trim(),
       department: department.value,
       youtube_id: materialType.value === 'video' ? youtubeId.value.trim() || null : null,
+      quiz_required: department.value === 'General' ? quizRequired.value : true,
       is_draft: true,
       created_by: auth.profile?.id,
     })
@@ -98,6 +100,7 @@ async function createDraft() {
   title.value = ''
   youtubeId.value = ''
   documentFile.value = null
+  quizRequired.value = true
   saving.value = false
   await loadModules()
 }
@@ -200,6 +203,12 @@ async function removeAudience(d: Department) {
           <option v-for="d in departments" :key="d.id" :value="d.name">{{ d.name }}</option>
         </select>
       </div>
+      <div v-if="department === 'General'" class="field">
+        <label style="display: flex; align-items: center; gap: 6px; font-weight: 400">
+          <input v-model="quizRequired" type="checkbox" style="width: auto" />
+          Quiz required for this module
+        </label>
+      </div>
       <button class="btn btn-primary" :disabled="saving" @click="createDraft">
         {{ saving ? 'Saving…' : 'Save as draft' }}
       </button>
@@ -229,7 +238,9 @@ async function removeAudience(d: Department) {
               <span :class="['pill', m.is_draft ? 'pill-danger' : isScheduledFuture(m) ? 'pill-outline' : 'pill-teal']">
                 {{
                   m.is_draft
-                    ? `Draft · ${questionCounts[m.id] ?? 0} of ${MIN_QUESTIONS_TO_PUBLISH}`
+                    ? m.department === 'General' && !m.quiz_required
+                      ? 'Draft · no quiz required'
+                      : `Draft · ${questionCounts[m.id] ?? 0} of ${MIN_QUESTIONS_TO_PUBLISH}`
                     : isScheduledFuture(m)
                       ? `Scheduled for ${m.scheduled_date}`
                       : 'Published'

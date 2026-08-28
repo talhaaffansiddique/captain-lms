@@ -22,6 +22,7 @@ const departments = ref<Department[]>([])
 const detailTitle = ref('')
 const detailDepartment = ref('')
 const detailYoutubeId = ref('')
+const detailQuizRequired = ref(true)
 const savingDetails = ref(false)
 
 const newQuestion = ref('')
@@ -60,6 +61,7 @@ async function load() {
   detailTitle.value = mod?.title ?? ''
   detailDepartment.value = mod?.department ?? 'General'
   detailYoutubeId.value = mod?.youtube_id ?? ''
+  detailQuizRequired.value = mod?.quiz_required ?? true
   loading.value = false
 }
 
@@ -75,6 +77,9 @@ async function saveDetails() {
       title: detailTitle.value.trim(),
       department: detailDepartment.value,
       youtube_id: youtubeId,
+      // Only meaningful for General modules — department modules always have a quiz via the
+      // 5-module grouping, so this is ignored for them either way.
+      quiz_required: detailDepartment.value === 'General' ? detailQuizRequired.value : true,
       // A module has a video OR a document, not both — saving a YouTube ID clears any uploaded file.
       ...(youtubeId ? { document_url: null, document_type: null } : {}),
     })
@@ -107,7 +112,8 @@ async function removeMaterial() {
   await load()
 }
 
-const canPublish = computed(() => questions.value.length >= MIN_QUESTIONS_TO_PUBLISH)
+const quizExempt = computed(() => module_.value?.department === 'General' && !module_.value.quiz_required)
+const canPublish = computed(() => quizExempt.value || questions.value.length >= MIN_QUESTIONS_TO_PUBLISH)
 const isScheduledFuture = computed(
   () => !!module_.value?.scheduled_date && module_.value.scheduled_date > new Date().toISOString().slice(0, 10),
 )
@@ -222,14 +228,14 @@ async function saveSchedule() {
     <div class="topline">
       <div>
         <h2 style="font-size: 20px">{{ module_.title }}</h2>
-        <p>{{ module_.department }} · {{ questions.length }} of {{ MIN_QUESTIONS_TO_PUBLISH }} questions</p>
+        <p>{{ module_.department }} · {{ quizExempt ? 'no quiz required' : `${questions.length} of ${MIN_QUESTIONS_TO_PUBLISH} questions` }}</p>
       </div>
       <div style="display: flex; gap: 8px">
         <button class="btn btn-ghost btn-sm" @click="router.push('/admin/modules')">Back to modules</button>
         <button
           class="btn btn-primary btn-sm"
           :disabled="publishBusy || (module_.is_draft && !canPublish)"
-          :title="module_.is_draft && !canPublish ? `Needs at least ${MIN_QUESTIONS_TO_PUBLISH} questions` : ''"
+          :title="module_.is_draft && !canPublish ? `Needs at least ${MIN_QUESTIONS_TO_PUBLISH} questions` : quizExempt ? 'No quiz required for this module' : ''"
           @click="togglePublish"
         >
           {{ module_.is_draft ? 'Publish' : 'Unpublish' }}
@@ -240,14 +246,16 @@ async function saveSchedule() {
     <span :class="['pill', module_.is_draft ? 'pill-danger' : isScheduledFuture ? 'pill-outline' : 'pill-teal']" style="margin-bottom: 16px; display: inline-block">
       {{
         module_.is_draft
-          ? `Draft · ${questions.length} of ${MIN_QUESTIONS_TO_PUBLISH}`
+          ? quizExempt
+            ? 'Draft · no quiz required'
+            : `Draft · ${questions.length} of ${MIN_QUESTIONS_TO_PUBLISH}`
           : isScheduledFuture
             ? `Scheduled for ${module_.scheduled_date}`
             : 'Published'
       }}
     </span>
 
-    <div class="card" style="padding: 16px; margin-bottom: 20px; max-width: 640px">
+    <div class="card" style="padding: 16px; margin-bottom: 20px" :style="{ maxWidth: module_.document_url ? '100%' : '640px' }">
       <div v-if="module_.youtube_id" class="video-box">
         <iframe
           :src="`https://www.youtube-nocookie.com/embed/${module_.youtube_id}?rel=0&modestbranding=1&iv_load_policy=3`"
@@ -255,7 +263,9 @@ async function saveSchedule() {
           allowfullscreen
         />
       </div>
-      <div v-else-if="module_.document_url && module_.document_type" class="video-box">
+      <!-- Documents get a viewport-scaled box instead of a fixed 16:9 one — a PPTX/PDF page reads
+           poorly letterboxed into a small video-shaped rectangle, especially on a large screen. -->
+      <div v-else-if="module_.document_url && module_.document_type" class="document-box">
         <iframe
           :src="documentEmbedUrl(module_.document_url, module_.document_type)"
           style="width: 100%; height: 100%; border: 0"
@@ -299,6 +309,16 @@ async function saveSchedule() {
           <option value="General">General</option>
           <option v-for="d in departments" :key="d.id" :value="d.name">{{ d.name }}</option>
         </select>
+      </div>
+      <div v-if="detailDepartment === 'General'" class="field">
+        <label style="display: flex; align-items: center; gap: 6px; font-weight: 400">
+          <input v-model="detailQuizRequired" type="checkbox" style="width: auto" />
+          Quiz required for this module
+        </label>
+        <p class="hint" style="margin-top: 4px">
+          Department modules always have a quiz (grouped every 5 into a milestone). For General modules only, you can
+          turn this off for something purely informational — it publishes without needing any questions.
+        </p>
       </div>
       <button class="btn btn-ghost btn-sm" :disabled="savingDetails" @click="saveDetails">
         {{ savingDetails ? 'Saving…' : 'Save details' }}
@@ -413,5 +433,18 @@ async function saveSchedule() {
   place-items: center;
   color: #cfd3e6;
   font-size: 13px;
+}
+.document-box {
+  width: 100%;
+  height: min(85vh, 1100px);
+  min-height: 420px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: linear-gradient(150deg, #1a1d2b, #0d0f18);
+}
+@media (max-width: 760px) {
+  .document-box {
+    height: 70vh;
+  }
 }
 </style>

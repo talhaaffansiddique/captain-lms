@@ -21,6 +21,10 @@ create table if not exists modules (
   youtube_id text,
   document_url text, -- public URL in the module-materials storage bucket, if this module is a document instead of a video
   document_type text, -- 'pdf' | 'pptx' | 'ppt' | 'docx' | 'doc' — inferred from the uploaded filename
+  -- Only meaningful for department = 'General': department-specific modules are always grouped
+  -- into a milestone quiz regardless of this flag, but a General module can opt out of having
+  -- its own quiz entirely (e.g. a policy video that's just informational).
+  quiz_required boolean not null default true,
   duration_seconds int not null default 300,
   is_draft boolean not null default true,
   scheduled_date date,

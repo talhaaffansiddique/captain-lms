@@ -20,6 +20,7 @@ export interface Module {
   youtube_id: string | null
   document_url: string | null
   document_type: string | null
+  quiz_required: boolean
   duration_seconds: number
   is_draft: boolean
   scheduled_date: string | null
