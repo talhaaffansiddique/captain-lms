@@ -2,6 +2,7 @@
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import ThemeToggle from '@/components/ThemeToggle.vue'
+import VersionTag from '@/components/VersionTag.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -34,7 +35,10 @@ const links = [
             <div class="rl">ADMIN</div>
           </div>
         </div>
-        <button class="signout" @click="logout">Sign out</button>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+          <button class="signout" style="width: auto" @click="logout">Sign out</button>
+          <VersionTag />
+        </div>
       </div>
     </aside>
 
@@ -44,6 +48,7 @@ const links = [
         <div style="display: flex; align-items: center; gap: 4px">
           <ThemeToggle variant="icon" />
           <button class="theme-cycle-btn" style="color: #e08975" title="Sign out" @click="logout">⏻</button>
+          <VersionTag />
         </div>
       </div>
 

@@ -9,8 +9,8 @@ import { APP_VERSION } from '@/lib/version'
 <style scoped>
 .version-badge {
   position: fixed;
-  top: 10px;
-  right: 12px;
+  bottom: 14px;
+  left: 14px;
   z-index: 200;
   padding: 3px 9px;
   border-radius: 999px;
@@ -21,12 +21,5 @@ import { APP_VERSION } from '@/lib/version'
   letter-spacing: 0.02em;
   box-shadow: var(--shadow);
   pointer-events: none;
-}
-@media (max-width: 760px) {
-  .version-badge {
-    top: auto;
-    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
-    right: 10px;
-  }
 }
 </style>

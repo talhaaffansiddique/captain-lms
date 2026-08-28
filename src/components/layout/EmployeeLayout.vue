@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { loadTrackData, pendingMilestones } from '@/lib/quiz'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import NotificationsBell from '@/components/NotificationsBell.vue'
+import VersionTag from '@/components/VersionTag.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -58,7 +59,10 @@ const initials = () =>
             <div class="rl">{{ auth.profile?.department?.toUpperCase() }}</div>
           </div>
         </div>
-        <button class="signout" @click="logout">Sign out</button>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+          <button class="signout" style="width: auto" @click="logout">Sign out</button>
+          <VersionTag />
+        </div>
       </div>
     </aside>
 
@@ -76,6 +80,7 @@ const initials = () =>
           >
             ⏻
           </button>
+          <VersionTag />
         </div>
       </div>
 

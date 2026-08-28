@@ -1,8 +1,5 @@
-<script setup lang="ts">
-import VersionBadge from '@/components/VersionBadge.vue'
-</script>
+<script setup lang="ts"></script>
 
 <template>
   <RouterView />
-  <VersionBadge />
 </template>

@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { supabaseConfigured } from '@/lib/supabase'
 import { loadDepartments } from '@/lib/departments'
 import ThemeToggle from '@/components/ThemeToggle.vue'
+import VersionBadge from '@/components/VersionBadge.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -50,6 +51,7 @@ async function submit() {
     <div class="theme-cycle-btn auth-theme-toggle">
       <ThemeToggle variant="icon" />
     </div>
+    <VersionBadge />
 
     <div class="auth-card">
       <div class="auth-visual">
