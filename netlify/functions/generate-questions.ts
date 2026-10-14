@@ -188,7 +188,8 @@ function balanceAnswers(questions: GeneratedQuestion[]): GeneratedQuestion[] {
 }
 
 async function callGemini(parts: Part[], apiKey: string, model: string): Promise<string> {
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+  const doFetch = () =>
+    fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
     body: JSON.stringify({
@@ -214,16 +215,32 @@ async function callGemini(parts: Part[], apiKey: string, model: string): Promise
       },
     }),
   })
+  let res = await doFetch()
+  if (res.status === 503 || res.status === 500) {
+    // Temporary overload on Google's side — one quick retry usually clears it.
+    await new Promise((r) => setTimeout(r, 2500))
+    res = await doFetch()
+  }
 
   if (res.status === 429) {
     throw new UserFacingError('Gemini free-tier limit reached. Nothing was lost — wait about a minute and try again.', 'rate_limit', 429)
   }
-  if (res.status === 400 || res.status === 403) {
+  if (!res.ok) {
     const detail = await res.text()
-    if (/api key/i.test(detail)) throw new UserFacingError('The Gemini API key is invalid or missing.', 'bad_key', 500)
-    throw new UserFacingError('Gemini could not read this material.', 'unreadable', 422)
+    let message = detail.slice(0, 300)
+    try {
+      message = (JSON.parse(detail) as { error?: { message?: string } }).error?.message ?? message
+    } catch {
+      // keep raw text
+    }
+    console.error('Gemini error', res.status, message)
+    if (/api key/i.test(message)) throw new UserFacingError('The Gemini API key is invalid or missing.', 'bad_key', 500)
+    if (res.status === 404) {
+      throw new UserFacingError(`Gemini model "${model}" isn't available for this key. Set GEMINI_MODEL in Netlify to another model (e.g. gemini-2.0-flash).`, 'bad_model', 500)
+    }
+    if (res.status === 400 || res.status === 403) throw new UserFacingError(`Gemini could not read this material: ${message}`, 'unreadable', 422)
+    throw new UserFacingError(`Gemini error ${res.status}: ${message}`, 'upstream', 502)
   }
-  if (!res.ok) throw new UserFacingError('Gemini is unavailable right now. Try again shortly.', 'upstream', 502)
 
   const data = (await res.json()) as {
     candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[]
@@ -282,7 +299,7 @@ export default async (req: Request) => {
         reply = await callGemini(parts, geminiKey, model)
       } catch (e) {
         // A video Gemini can't open (private, no captions, too long) — ask for a pasted transcript instead.
-        if (mod.youtube_id && !transcript.trim() && e instanceof UserFacingError && (e.code === 'unreadable' || e.code === 'empty')) {
+        if (mod.youtube_id && !transcript.trim() && e instanceof UserFacingError && (e.code === 'unreadable' || e.code === 'empty' || e.code === 'upstream')) {
           throw new UserFacingError(
             "Couldn't read this video automatically (it may be private, very long, or have no captions). Paste its transcript below and try again.",
             'need_transcript',
