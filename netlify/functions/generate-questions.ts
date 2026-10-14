@@ -201,7 +201,9 @@ function balanceAnswers(questions: GeneratedQuestion[]): GeneratedQuestion[] {
   })
 }
 
-async function callGemini(parts: Part[], apiKey: string, model: string, timeoutMs: number, thinking = true): Promise<string> {
+async function callGemini(parts: Part[], apiKey: string, model: string, timeoutMs: number, level = 0): Promise<string> {
+  // level 0: full request; 1: without the speed (thinking) setting; 2: also without the strict output
+  // schema. Different Gemini models accept different options, so degrade instead of failing outright.
   const doFetch = () =>
     fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: 'POST',
@@ -213,7 +215,7 @@ async function callGemini(parts: Part[], apiKey: string, model: string, timeoutM
       generationConfig: {
         temperature: 0.4,
         responseMimeType: 'application/json',
-        responseSchema: {
+        ...(level < 2 ? { responseSchema: {
           type: 'ARRAY',
           items: {
             type: 'OBJECT',
@@ -225,8 +227,8 @@ async function callGemini(parts: Part[], apiKey: string, model: string, timeoutM
             },
             required: ['question', 'options', 'correct_index', 'difficulty'],
           },
-        },
-        ...(thinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+        } } : {}),
+        ...(level === 0 ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
       },
     }),
   })
@@ -250,7 +252,9 @@ async function callGemini(parts: Part[], apiKey: string, model: string, timeoutM
     }
     console.error('Gemini error', res.status, message)
     if (/api key/i.test(message)) throw new UserFacingError('The Gemini API key is invalid or missing.', 'bad_key', 500)
-    if (thinking && res.status === 400 && /think/i.test(message)) return callGemini(parts, apiKey, model, timeoutMs, false)
+    if (res.status === 400 && level < 2 && /invalid argument|think|schema/i.test(message)) {
+      return callGemini(parts, apiKey, model, timeoutMs, level + 1)
+    }
     if (res.status === 404) {
       throw new UserFacingError(`Gemini model "${model}" isn't available for this key. Set GEMINI_MODEL in Netlify to another model (e.g. gemini-2.0-flash).`, 'bad_model', 500)
     }
@@ -350,14 +354,14 @@ export default async (req: Request) => {
       } catch (e) {
         if (!(e instanceof UserFacingError)) throw e
         lastError = e
-        // Overloaded, missing, or slow model: move on to the next candidate.
-        if (['upstream', 'bad_model', 'timeout', 'empty'].includes(e.code)) continue
         if (e.code === 'unreadable' && mod.youtube_id && !transcript.trim()) {
           throw new UserFacingError(
             "Couldn't read this video automatically (it may be private or have no captions). Paste its transcript below and try again.",
             'need_transcript',
           )
         }
+        // Overloaded, missing, slow, or fussy model: move on to the next candidate.
+        if (['upstream', 'bad_model', 'timeout', 'empty', 'unreadable'].includes(e.code)) continue
         throw e
       }
 
