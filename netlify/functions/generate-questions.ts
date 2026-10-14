@@ -330,6 +330,7 @@ export default async (req: Request) => {
   const BUDGET_MS = 24_000 // Netlify cuts synchronous functions off at ~26-30s
   const left = () => BUDGET_MS - (Date.now() - started)
   const tried = new Set<string>()
+  const attempts: string[] = []
   let queue = [process.env.GEMINI_MODEL || 'gemini-2.5-flash']
   let listed = false
 
@@ -349,11 +350,14 @@ export default async (req: Request) => {
       tried.add(model)
 
       let reply: string
+      const t0 = Date.now()
       try {
-        reply = await callGemini(parts, geminiKey, model, left())
+        // Cap each attempt so one slow model can't eat the whole budget.
+        reply = await callGemini(parts, geminiKey, model, Math.min(left(), 14_000))
       } catch (e) {
         if (!(e instanceof UserFacingError)) throw e
         lastError = e
+        attempts.push(`${model}: ${e.code} (${Math.round((Date.now() - t0) / 1000)}s)`)
         if (e.code === 'unreadable' && mod.youtube_id && !transcript.trim()) {
           throw new UserFacingError(
             "Couldn't read this video automatically (it may be private or have no captions). Paste its transcript below and try again.",
@@ -384,7 +388,8 @@ export default async (req: Request) => {
     if (lastProblem) {
       return json({ error: `The AI's reply wasn't usable (${lastProblem}). Try again.`, code: 'invalid_reply' }, 502)
     }
-    throw lastError ?? new UserFacingError('Gemini is busy right now. Try again in a minute.', 'upstream', 503)
+    console.error('All attempts failed', attempts)
+    throw new UserFacingError(`${lastError?.message ?? 'Gemini is busy right now. Try again in a minute.'} [${attempts.join('; ')}]`, lastError?.code ?? 'upstream', lastError?.status ?? 503)
   } catch (e) {
     if (e instanceof UserFacingError) return json({ error: e.message, code: e.code }, e.status)
     return json({ error: 'Something went wrong while generating questions.', code: 'unknown' }, 500)
