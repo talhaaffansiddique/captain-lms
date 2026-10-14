@@ -282,10 +282,13 @@ async function listFlashModels(apiKey: string): Promise<string[]> {
   const names = (data.models ?? [])
     .filter((m) => m.supportedGenerationMethods?.includes('generateContent'))
     .map((m) => m.name.replace(/^models\//, ''))
-  const rank = (n: string) => parseFloat(n.split('-')[1]) * (n.endsWith('-lite') ? 0.5 : 1)
-  return names
-    .filter((n) => /^gemini-[\d.]+-flash(-lite)?$/.test(n))
-    .sort((a, b) => rank(b) - rank(a))
+  // Newest models are usually the most overloaded, so try the light ("lite") ones first, newest to
+  // oldest, then the regular Flash ones from oldest (most settled) to newest.
+  const flash = names.filter((n) => /^gemini-[\d.]+-flash(-lite)?$/.test(n))
+  const version = (n: string) => parseFloat(n.split('-')[1])
+  const lite = flash.filter((n) => n.endsWith('-lite')).sort((a, b) => version(b) - version(a))
+  const regular = flash.filter((n) => !n.endsWith('-lite')).sort((a, b) => version(a) - version(b))
+  return [...lite, ...regular]
 }
 
 export default async (req: Request) => {
@@ -331,7 +334,7 @@ export default async (req: Request) => {
   const left = () => BUDGET_MS - (Date.now() - started)
   const tried = new Set<string>()
   const attempts: string[] = []
-  let queue = [process.env.GEMINI_MODEL || 'gemini-2.5-flash']
+  let queue = [process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite']
   let listed = false
 
   try {
