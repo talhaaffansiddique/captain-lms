@@ -6,7 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import { logActivity } from '@/lib/activity'
 import { loadDepartments } from '@/lib/departments'
 import { parseYoutubeId } from '@/lib/youtube'
-import { uploadModuleMaterial, documentEmbedUrl } from '@/lib/materials'
+import { uploadModuleMaterial, documentEmbedUrl, deleteMaterialFile } from '@/lib/materials'
 import { MIN_QUESTIONS_TO_PUBLISH, parseBulkQuestions } from '@/lib/quiz'
 import { generateQuestions, type GeneratedQuestion } from '@/lib/generateQuestions'
 import type { Module, QuizQuestion, Department } from '@/lib/database.types'
@@ -277,6 +277,28 @@ async function togglePublish() {
   await load()
 }
 
+const deleting = ref(false)
+async function deleteModule() {
+  if (!module_.value) return
+  const ok = window.confirm(
+    `Delete "${module_.value.title}" permanently?
+
+This also removes its questions, its uploaded file, and every employee's completion record for it. This cannot be undone. (To just hide it from employees, use Unpublish instead.)`,
+  )
+  if (!ok) return
+  deleting.value = true
+  const title = module_.value.title
+  const { error } = await supabase.from('modules').delete().eq('id', moduleId)
+  if (error) {
+    deleting.value = false
+    window.alert(`Could not delete: ${error.message}`)
+    return
+  }
+  await deleteMaterialFile(module_.value.document_url)
+  await logActivity(auth.profile?.id, `Deleted module "${title}"`)
+  router.push('/admin/modules')
+}
+
 async function saveSchedule() {
   savingSchedule.value = true
   await supabase
@@ -311,6 +333,9 @@ async function saveSchedule() {
           @click="togglePublish"
         >
           {{ module_.is_draft ? 'Publish' : 'Unpublish' }}
+        </button>
+        <button class="btn btn-ghost btn-sm" style="color: var(--danger)" :disabled="deleting" @click="deleteModule">
+          {{ deleting ? 'Deleting…' : 'Delete' }}
         </button>
       </div>
     </div>

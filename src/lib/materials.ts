@@ -57,3 +57,13 @@ export function formatDuration(m: MaterialModule & { duration_seconds: number })
   const mins = Math.round(m.duration_seconds / 60)
   return mins < 1 ? '<1 min' : `${mins} min`
 }
+
+/** Removes an uploaded file from storage given its public URL (no-op for anything not in our bucket). */
+export async function deleteMaterialFile(publicUrl: string | null): Promise<void> {
+  if (!publicUrl) return
+  const marker = `/${BUCKET}/`
+  const i = publicUrl.indexOf(marker)
+  if (i === -1) return
+  const path = decodeURIComponent(publicUrl.slice(i + marker.length))
+  await supabase.storage.from(BUCKET).remove([path])
+}

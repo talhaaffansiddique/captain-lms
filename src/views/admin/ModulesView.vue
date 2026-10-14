@@ -5,7 +5,8 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
 import { loadDepartments } from '@/lib/departments'
 import { parseYoutubeId } from '@/lib/youtube'
-import { uploadModuleMaterial, formatDuration } from '@/lib/materials'
+import { uploadModuleMaterial, formatDuration, deleteMaterialFile } from '@/lib/materials'
+import { logActivity } from '@/lib/activity'
 import { MIN_QUESTIONS_TO_PUBLISH } from '@/lib/quiz'
 import type { Module, Department } from '@/lib/database.types'
 
@@ -112,6 +113,35 @@ async function createDraft() {
   await loadModules()
 }
 
+async function togglePublish(m: Module) {
+  if (m.is_draft) {
+    const exempt = m.department === 'General' && !m.quiz_required
+    if (!exempt && (questionCounts.value[m.id] ?? 0) < MIN_QUESTIONS_TO_PUBLISH) {
+      window.alert(`Needs at least ${MIN_QUESTIONS_TO_PUBLISH} questions before it can be published.`)
+      return
+    }
+  }
+  await supabase.from('modules').update({ is_draft: !m.is_draft }).eq('id', m.id)
+  await logActivity(auth.profile?.id, `${m.is_draft ? 'Published' : 'Unpublished'} "${m.title}"`)
+  await loadModules()
+}
+
+async function deleteModule(m: Module) {
+  const ok = window.confirm(
+    `Delete "${m.title}" permanently?
+
+This also removes its questions, its uploaded file, and every employee's completion record for it. This cannot be undone. (To just hide it from employees, use Unpublish instead.)`,
+  )
+  if (!ok) return
+  const { error } = await supabase.from('modules').delete().eq('id', m.id)
+  if (error) {
+    window.alert(`Could not delete: ${error.message}`)
+    return
+  }
+  await deleteMaterialFile(m.document_url)
+  await logActivity(auth.profile?.id, `Deleted module "${m.title}"`)
+  await loadModules()
+}
 </script>
 
 <template>
@@ -205,7 +235,13 @@ async function createDraft() {
                 }}
               </span>
             </td>
-            <td><RouterLink class="btn btn-ghost btn-sm" :to="`/admin/modules/${m.id}`">Open</RouterLink></td>
+            <td style="white-space: nowrap">
+              <RouterLink class="btn btn-ghost btn-sm" :to="`/admin/modules/${m.id}`">Open</RouterLink>
+              <button class="btn btn-ghost btn-sm" style="margin-left: 4px" @click="togglePublish(m)">
+                {{ m.is_draft ? 'Publish' : 'Unpublish' }}
+              </button>
+              <button class="btn btn-ghost btn-sm" style="margin-left: 4px; color: var(--danger)" @click="deleteModule(m)">Delete</button>
+            </td>
           </tr>
         </tbody>
       </table>
