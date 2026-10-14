@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
 import { loadDepartments } from '@/lib/departments'
+import { parseYoutubeId } from '@/lib/youtube'
 import { uploadModuleMaterial, formatDuration } from '@/lib/materials'
 import { MIN_QUESTIONS_TO_PUBLISH } from '@/lib/quiz'
 import type { Module, Department } from '@/lib/database.types'
@@ -61,6 +62,11 @@ async function createDraft() {
     createError.value = 'Choose a file to upload, or switch to Video.'
     return
   }
+  const parsedYoutubeId = materialType.value === 'video' && youtubeId.value.trim() ? parseYoutubeId(youtubeId.value) : null
+  if (materialType.value === 'video' && youtubeId.value.trim() && !parsedYoutubeId) {
+    createError.value = "That doesn't look like a YouTube link or ID — paste the video link or its 11-character ID."
+    return
+  }
   createError.value = ''
   saving.value = true
 
@@ -69,7 +75,7 @@ async function createDraft() {
     .insert({
       title: title.value.trim(),
       department: department.value,
-      youtube_id: materialType.value === 'video' ? youtubeId.value.trim() || null : null,
+      youtube_id: parsedYoutubeId,
       quiz_required: department.value === 'General' ? quizRequired.value : true,
       is_draft: true,
       created_by: auth.profile?.id,

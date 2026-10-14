@@ -106,7 +106,14 @@ async function materialParts(
   }
 
   if (mod.youtube_id) {
-    return [{ file_data: { file_uri: `https://www.youtube.com/watch?v=${mod.youtube_id}` } }]
+    const id = extractYoutubeId(mod.youtube_id)
+    if (!id) {
+      throw new UserFacingError(
+        "This module's YouTube ID doesn't look valid. Re-save the module with the 11-character ID or the full video link.",
+        'bad_youtube_id',
+      )
+    }
+    return [{ file_data: { file_uri: `https://www.youtube.com/watch?v=${id}` } }]
   }
 
   if (mod.document_url && mod.document_type) {
@@ -137,6 +144,13 @@ async function materialParts(
   }
 
   throw new UserFacingError('This module has no video or document yet.', 'no_material')
+}
+
+function extractYoutubeId(raw: string): string | null {
+  const v = raw.trim()
+  if (/^[\w-]{11}$/.test(v)) return v
+  const m = v.match(/(?:v=|youtu\.be\/|embed\/|shorts\/|live\/)([\w-]{11})/)
+  return m ? m[1] : null
 }
 
 function parseJson(text: string): unknown {
@@ -187,11 +201,12 @@ function balanceAnswers(questions: GeneratedQuestion[]): GeneratedQuestion[] {
   })
 }
 
-async function callGemini(parts: Part[], apiKey: string, model: string, thinking = true): Promise<string> {
+async function callGemini(parts: Part[], apiKey: string, model: string, timeoutMs: number, thinking = true): Promise<string> {
   const doFetch = () =>
     fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
+    signal: AbortSignal.timeout(timeoutMs),
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
       contents: [{ role: 'user', parts: [...parts, { text: USER_PROMPT }] }],
@@ -215,11 +230,11 @@ async function callGemini(parts: Part[], apiKey: string, model: string, thinking
       },
     }),
   })
-  let res = await doFetch()
-  if (res.status === 503 || res.status === 500) {
-    // Temporary overload on Google's side — one quick retry usually clears it.
-    await new Promise((r) => setTimeout(r, 2500))
+  let res: Response
+  try {
     res = await doFetch()
+  } catch {
+    throw new UserFacingError('Gemini took too long to respond.', 'timeout', 504)
   }
 
   if (res.status === 429) {
@@ -235,7 +250,7 @@ async function callGemini(parts: Part[], apiKey: string, model: string, thinking
     }
     console.error('Gemini error', res.status, message)
     if (/api key/i.test(message)) throw new UserFacingError('The Gemini API key is invalid or missing.', 'bad_key', 500)
-    if (thinking && res.status === 400 && /think/i.test(message)) return callGemini(parts, apiKey, model, false)
+    if (thinking && res.status === 400 && /think/i.test(message)) return callGemini(parts, apiKey, model, timeoutMs, false)
     if (res.status === 404) {
       throw new UserFacingError(`Gemini model "${model}" isn't available for this key. Set GEMINI_MODEL in Netlify to another model (e.g. gemini-2.0-flash).`, 'bad_model', 500)
     }
@@ -253,18 +268,20 @@ async function callGemini(parts: Part[], apiKey: string, model: string, thinking
 
 // Google renames/retires models over time. If the configured one is gone for this key, ask the API
 // which models exist and pick the newest plain "flash" model that supports generateContent.
-async function findWorkingModel(apiKey: string): Promise<string | null> {
+async function listFlashModels(apiKey: string): Promise<string[]> {
   const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', {
     headers: { 'x-goog-api-key': apiKey },
+    signal: AbortSignal.timeout(5000),
   })
-  if (!res.ok) return null
+  if (!res.ok) return []
   const data = (await res.json()) as { models?: { name: string; supportedGenerationMethods?: string[] }[] }
-  const candidates = (data.models ?? [])
+  const names = (data.models ?? [])
     .filter((m) => m.supportedGenerationMethods?.includes('generateContent'))
     .map((m) => m.name.replace(/^models\//, ''))
-    .filter((n) => /^gemini-[\d.]+-flash$/.test(n))
-    .sort((a, b) => parseFloat(b.split('-')[1]) - parseFloat(a.split('-')[1]))
-  return candidates[0] ?? null
+  const rank = (n: string) => parseFloat(n.split('-')[1]) * (n.endsWith('-lite') ? 0.5 : 1)
+  return names
+    .filter((n) => /^gemini-[\d.]+-flash(-lite)?$/.test(n))
+    .sort((a, b) => rank(b) - rank(a))
 }
 
 export default async (req: Request) => {
@@ -305,45 +322,65 @@ export default async (req: Request) => {
     .single()
   if (!mod) return json({ error: 'Module not found' }, 404)
 
-  let model = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+  const started = Date.now()
+  const BUDGET_MS = 24_000 // Netlify cuts synchronous functions off at ~26-30s
+  const left = () => BUDGET_MS - (Date.now() - started)
+  const tried = new Set<string>()
+  let queue = [process.env.GEMINI_MODEL || 'gemini-2.5-flash']
+  let listed = false
 
   try {
     const parts = await materialParts(mod, transcript)
     let lastProblem = ''
-    for (let attempt = 0; attempt < 2; attempt++) {
+    let lastError: UserFacingError | null = null
+
+    while (left() > 4000) {
+      const model = queue.find((m) => !tried.has(m))
+      if (!model) {
+        if (listed) break
+        listed = true
+        queue = [...queue, ...(await listFlashModels(geminiKey).catch(() => []))]
+        continue
+      }
+      tried.add(model)
+
       let reply: string
       try {
-        try {
-          reply = await callGemini(parts, geminiKey, model)
-        } catch (e) {
-          if (e instanceof UserFacingError && e.code === 'bad_model') {
-            const alt = await findWorkingModel(geminiKey)
-            if (!alt || alt === model) throw e
-            console.log(`Model ${model} unavailable, switching to ${alt}`)
-            model = alt
-            reply = await callGemini(parts, geminiKey, model)
-          } else {
-            throw e
-          }
-        }
+        reply = await callGemini(parts, geminiKey, model, left())
       } catch (e) {
-        // A video Gemini can't open (private, no captions, too long) — ask for a pasted transcript instead.
-        if (mod.youtube_id && !transcript.trim() && e instanceof UserFacingError && (e.code === 'unreadable' || e.code === 'empty' || e.code === 'upstream')) {
+        if (!(e instanceof UserFacingError)) throw e
+        lastError = e
+        // Overloaded, missing, or slow model: move on to the next candidate.
+        if (['upstream', 'bad_model', 'timeout', 'empty'].includes(e.code)) continue
+        if (e.code === 'unreadable' && mod.youtube_id && !transcript.trim()) {
           throw new UserFacingError(
-            "Couldn't read this video automatically (it may be private, very long, or have no captions). Paste its transcript below and try again.",
+            "Couldn't read this video automatically (it may be private or have no captions). Paste its transcript below and try again.",
             'need_transcript',
           )
         }
         throw e
       }
+
       try {
         const questions = balanceAnswers(validate(parseJson(reply)))
-        return json({ questions, retried: attempt > 0 })
+        return json({ questions, model })
       } catch (e) {
         lastProblem = e instanceof Error ? e.message : 'Invalid reply'
+        tried.delete(model) // the same model may answer properly on a second go
+        if (tried.size > 6) break
       }
     }
-    return json({ error: `The AI's reply wasn't usable twice in a row (${lastProblem}). Try again.`, code: 'invalid_reply' }, 502)
+
+    if (mod.youtube_id && !transcript.trim()) {
+      throw new UserFacingError(
+        "Couldn't read this video in time (long videos take a while). Paste its transcript below and try again.",
+        'need_transcript',
+      )
+    }
+    if (lastProblem) {
+      return json({ error: `The AI's reply wasn't usable (${lastProblem}). Try again.`, code: 'invalid_reply' }, 502)
+    }
+    throw lastError ?? new UserFacingError('Gemini is busy right now. Try again in a minute.', 'upstream', 503)
   } catch (e) {
     if (e instanceof UserFacingError) return json({ error: e.message, code: e.code }, e.status)
     return json({ error: 'Something went wrong while generating questions.', code: 'unknown' }, 500)

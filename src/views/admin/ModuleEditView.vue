@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
 import { logActivity } from '@/lib/activity'
 import { loadDepartments } from '@/lib/departments'
+import { parseYoutubeId } from '@/lib/youtube'
 import { uploadModuleMaterial, documentEmbedUrl } from '@/lib/materials'
 import { MIN_QUESTIONS_TO_PUBLISH, parseBulkQuestions } from '@/lib/quiz'
 import { generateQuestions, type GeneratedQuestion } from '@/lib/generateQuestions'
@@ -70,8 +71,13 @@ onMounted(load)
 
 async function saveDetails() {
   if (!detailTitle.value.trim()) return
+  const rawYoutube = detailYoutubeId.value.trim()
+  const youtubeId = rawYoutube ? parseYoutubeId(rawYoutube) : null
+  if (rawYoutube && !youtubeId) {
+    window.alert("That doesn't look like a YouTube link or ID — paste the video link or its 11-character ID.")
+    return
+  }
   savingDetails.value = true
-  const youtubeId = detailYoutubeId.value.trim() || null
   await supabase
     .from('modules')
     .update({

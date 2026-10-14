@@ -66,3 +66,11 @@ export function loadYouTubeIframeApi(): Promise<void> {
   })
   return apiPromise
 }
+
+// Accepts a bare 11-character ID or any common YouTube link and returns just the ID (null if unrecognised).
+export function parseYoutubeId(raw: string): string | null {
+  const v = raw.trim()
+  if (/^[\w-]{11}$/.test(v)) return v
+  const m = v.match(/(?:v=|youtu\.be\/|embed\/|shorts\/|live\/)([\w-]{11})/)
+  return m ? m[1]! : null
+}
