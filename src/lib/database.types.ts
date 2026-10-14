@@ -10,6 +10,7 @@ export interface Profile {
   role: Role
   department: string
   due_date: string | null
+  is_active?: boolean
   created_at: string
 }
 

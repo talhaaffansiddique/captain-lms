@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { supabase } from '@/lib/supabase'
+import { isActive } from '@/lib/employees'
 import { useAuthStore } from '@/stores/auth'
 import { logActivity } from '@/lib/activity'
 import type { ActivityLogEntry } from '@/lib/database.types'
@@ -23,12 +24,12 @@ const loadingDigest = ref(false)
 const digestError = ref('')
 
 async function load() {
-  const [{ count: ec }, { count: mc }, { data: act }] = await Promise.all([
-    supabase.from('profiles').select('*', { count: 'exact', head: true }),
+  const [{ data: profs }, { count: mc }, { data: act }] = await Promise.all([
+    supabase.from('profiles').select('*'),
     supabase.from('modules').select('*', { count: 'exact', head: true }).eq('is_draft', false),
     supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(8),
   ])
-  employeeCount.value = ec ?? 0
+  employeeCount.value = (profs ?? []).filter(isActive).length
   moduleCount.value = mc ?? 0
   activity.value = act ?? []
 }

@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
 import { logActivity } from '@/lib/activity'
 import { loadDepartments } from '@/lib/departments'
+import { manageEmployee, isActive } from '@/lib/employees'
 import { allMilestonesForTrack, milestoneLabel, attemptsFor, maxAttemptsFor, hasPassed, loadTrackData } from '@/lib/quiz'
 import type { Profile, QuizAttempt, QuizAttemptGrant, Department, Module } from '@/lib/database.types'
 
@@ -28,6 +29,78 @@ const selectedDepartment = ref('')
 const savingDepartment = ref(false)
 const track = ref<Module[]>([])
 
+const accountEmail = ref<string | null>(null)
+const lastSignIn = ref<string | null>(null)
+const editName = ref('')
+const editRole = ref('employee')
+const savingAccount = ref(false)
+const accountMessage = ref<{ ok: boolean; text: string } | null>(null)
+const accountBusy = ref(false)
+
+async function loadAccountInfo() {
+  const info = await manageEmployee({ action: 'get', id: employeeId })
+  accountEmail.value = info.email ?? null
+  lastSignIn.value = info.last_sign_in_at ?? null
+}
+
+async function saveAccount() {
+  if (!employee.value) return
+  accountMessage.value = null
+  savingAccount.value = true
+  const result = await manageEmployee({ action: 'update', id: employeeId, full_name: editName.value, role: editRole.value })
+  savingAccount.value = false
+  if (result.error) {
+    accountMessage.value = { ok: false, text: result.error }
+    return
+  }
+  await logActivity(auth.profile?.id, `Updated ${editName.value.trim()}'s account (name/role: ${editRole.value})`)
+  accountMessage.value = { ok: true, text: 'Saved.' }
+  await load()
+}
+
+async function toggleActive() {
+  if (!employee.value) return
+  const deactivating = isActive(employee.value)
+  if (
+    deactivating &&
+    !window.confirm(
+      `Deactivate ${employee.value.full_name}?\n\nThey won't be able to sign in and will disappear from the leaderboard and reports. Their history is kept and you can reactivate them any time.`,
+    )
+  )
+    return
+  accountMessage.value = null
+  accountBusy.value = true
+  const result = await manageEmployee({ action: deactivating ? 'deactivate' : 'reactivate', id: employeeId })
+  accountBusy.value = false
+  if (result.error) {
+    accountMessage.value = { ok: false, text: result.error }
+    return
+  }
+  await logActivity(auth.profile?.id, `${deactivating ? 'Deactivated' : 'Reactivated'} ${employee.value.full_name}`)
+  await load()
+}
+
+async function deleteAccount() {
+  if (!employee.value) return
+  if (
+    !window.confirm(
+      `Delete ${employee.value.full_name} permanently?\n\nThis removes their account and ALL their training history (completions, quiz attempts, badges). This cannot be undone.\n\nIf you only want to stop them signing in, use Deactivate instead.`,
+    )
+  )
+    return
+  accountMessage.value = null
+  accountBusy.value = true
+  const name = employee.value.full_name
+  const result = await manageEmployee({ action: 'delete', id: employeeId })
+  accountBusy.value = false
+  if (result.error) {
+    accountMessage.value = { ok: false, text: result.error }
+    return
+  }
+  await logActivity(auth.profile?.id, `Deleted ${name}`)
+  router.push('/admin/employees')
+}
+
 async function load() {
   loading.value = true
   const [{ data: emp }, { data: att }, { data: grt }, depts] = await Promise.all([
@@ -42,6 +115,8 @@ async function load() {
   dueDate.value = emp?.due_date ?? ''
   departments.value = depts
   selectedDepartment.value = emp?.department ?? 'General'
+  editName.value = emp?.full_name ?? ''
+  editRole.value = emp?.role ?? 'employee'
 
   if (emp) {
     const trackData = await loadTrackData(employeeId, emp.department)
@@ -52,7 +127,10 @@ async function load() {
   loading.value = false
 }
 
-onMounted(load)
+onMounted(async () => {
+  await load()
+  await loadAccountInfo()
+})
 
 async function saveDepartment() {
   if (!employee.value || selectedDepartment.value === employee.value.department) return
@@ -136,6 +214,49 @@ async function grantExtra(milestone: string) {
         <p>{{ employee.department }} · {{ employee.role }}</p>
       </div>
       <button class="btn btn-ghost btn-sm" @click="router.push('/admin/employees')">Back to employees</button>
+    </div>
+
+    <div class="card" style="padding: 18px; margin-bottom: 20px; max-width: 420px">
+      <div class="panel-title">
+        <h3>Account</h3>
+        <span :class="['pill', isActive(employee) ? 'pill-teal' : 'pill-muted']">{{ isActive(employee) ? 'Active' : 'Inactive' }}</span>
+      </div>
+      <p class="hint" style="margin-bottom: 10px">
+        {{ accountEmail ?? '…' }}
+        <template v-if="lastSignIn"> · last sign-in {{ new Date(lastSignIn).toLocaleDateString() }}</template>
+        <template v-else-if="accountEmail"> · hasn't signed in yet</template>
+      </p>
+      <div class="field"><label>Full name</label><input v-model="editName" type="text" /></div>
+      <div class="field">
+        <label>Role</label>
+        <select v-model="editRole">
+          <option value="employee">Employee</option>
+          <option value="manager">Manager</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap">
+        <button
+          class="btn btn-ghost btn-sm"
+          :disabled="savingAccount || (editName.trim() === employee.full_name && editRole === employee.role)"
+          @click="saveAccount"
+        >
+          {{ savingAccount ? 'Saving…' : 'Save' }}
+        </button>
+        <template v-if="employee.id !== auth.profile?.id">
+          <button class="btn btn-ghost btn-sm" :disabled="accountBusy" @click="toggleActive">
+            {{ isActive(employee) ? 'Deactivate' : 'Reactivate' }}
+          </button>
+          <button class="btn btn-ghost btn-sm" style="color: var(--danger)" :disabled="accountBusy" @click="deleteAccount">Delete</button>
+        </template>
+      </div>
+      <p v-if="accountMessage" class="hint" style="margin-top: 8px" :style="{ color: accountMessage.ok ? 'var(--teal)' : 'var(--danger)' }">
+        {{ accountMessage.text }}
+      </p>
+      <p class="hint" style="margin-top: 8px">
+        Deactivate stops them signing in and hides them from the leaderboard and reports, keeping their history.
+        Delete removes the account and all their progress permanently.
+      </p>
     </div>
 
     <div class="card" style="padding: 18px; margin-bottom: 20px; max-width: 420px">

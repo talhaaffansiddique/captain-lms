@@ -15,12 +15,12 @@ export async function computeDeptSummaries(db: SupabaseClient): Promise<DeptSumm
   const today = new Date().toISOString().slice(0, 10)
 
   const [{ data: profiles }, { data: completions }, { data: attempts }] = await Promise.all([
-    db.from('profiles').select('id, full_name, department, role, due_date'),
+    db.from('profiles').select('*'),
     db.from('video_completions').select('user_id, completed_at').eq('completed', true).gte('completed_at', weekAgo),
     db.from('quiz_attempts').select('user_id, passed, created_at').eq('passed', true).gte('created_at', weekAgo),
   ])
 
-  const allProfiles = profiles ?? []
+  const allProfiles = (profiles ?? []).filter((p) => p.is_active !== false)
   const departments = [...new Set(allProfiles.map((p) => p.department))]
 
   return departments.map((department) => {

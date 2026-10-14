@@ -23,6 +23,10 @@ export const useAuthStore = defineStore('auth', () => {
        
       console.error('Failed to load profile', error)
       profile.value = null
+    } else if (data.is_active === false) {
+      // Deactivated while still holding a valid session — end it.
+      await supabase.auth.signOut()
+      profile.value = null
     } else {
       profile.value = data
     }

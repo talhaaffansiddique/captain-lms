@@ -37,7 +37,8 @@ export default async () => {
 
   const db = createClient(supabaseUrl, serviceRoleKey)
   const summaries = await computeDeptSummaries(db)
-  const { data: profiles } = await db.from('profiles').select('id, full_name, department, role')
+  const { data: allProfiles } = await db.from('profiles').select('*')
+  const profiles = (allProfiles ?? []).filter((p) => p.is_active !== false)
 
   async function sendEmail(to: string, subject: string, html: string) {
     const res = await fetch('https://api.resend.com/emails', {

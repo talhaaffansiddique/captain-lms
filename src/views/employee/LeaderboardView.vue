@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { supabase } from '@/lib/supabase'
+import { isActive } from '@/lib/employees'
 import { useAuthStore } from '@/stores/auth'
 import { loadDepartments } from '@/lib/departments'
 
@@ -22,11 +23,11 @@ const department = ref('All')
 
 onMounted(async () => {
   const [{ data: p }, { data: c }, depts] = await Promise.all([
-    supabase.from('profiles').select('id, full_name, department'),
+    supabase.from('profiles').select('*'),
     supabase.from('video_completions').select('user_id, completed_at').eq('completed', true),
     loadDepartments(),
   ])
-  profiles.value = p ?? []
+  profiles.value = (p ?? []).filter(isActive)
   completions.value = c ?? []
   departmentOptions.value = ['All', 'General', ...depts.map((d) => d.name)]
 })

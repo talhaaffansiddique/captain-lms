@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
+import { isActive } from '@/lib/employees'
 import type { Profile } from '@/lib/database.types'
 
 const auth = useAuthStore()
@@ -11,7 +12,7 @@ onMounted(async () => {
   const dept = auth.profile?.department
   if (!dept) return
   const { data } = await supabase.from('profiles').select('*').eq('department', dept).order('full_name')
-  team.value = data ?? []
+  team.value = (data ?? []).filter(isActive)
 })
 </script>
 

@@ -10,6 +10,7 @@ create table if not exists profiles (
   role text not null check (role in ('employee', 'admin', 'manager')) default 'employee',
   department text not null default 'General',
   due_date date,
+  is_active boolean not null default true, -- false = deactivated: cannot sign in, hidden from reports
   created_at timestamptz not null default now()
 );
 
@@ -229,7 +230,7 @@ begin
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'full_name', new.email),
-    coalesce(new.raw_user_meta_data->>'role', 'employee'),
+    'employee', -- never trust a role from sign-up metadata; admins set roles server-side
     coalesce(new.raw_user_meta_data->>'department', 'General')
   );
   return new;
@@ -285,3 +286,6 @@ create policy "admins delete materials" on storage.objects
     bucket_id = 'module-materials'
     and exists (select 1 from profiles where id = auth.uid() and role = 'admin')
   );
+
+-- ---------- deactivating employees (run on an existing project) ----------
+alter table profiles add column if not exists is_active boolean not null default true;
