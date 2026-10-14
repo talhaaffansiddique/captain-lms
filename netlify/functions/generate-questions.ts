@@ -187,7 +187,7 @@ function balanceAnswers(questions: GeneratedQuestion[]): GeneratedQuestion[] {
   })
 }
 
-async function callGemini(parts: Part[], apiKey: string, model: string): Promise<string> {
+async function callGemini(parts: Part[], apiKey: string, model: string, thinking = true): Promise<string> {
   const doFetch = () =>
     fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: 'POST',
@@ -211,7 +211,7 @@ async function callGemini(parts: Part[], apiKey: string, model: string): Promise
             required: ['question', 'options', 'correct_index', 'difficulty'],
           },
         },
-        thinkingConfig: { thinkingBudget: 0 },
+        ...(thinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
       },
     }),
   })
@@ -235,6 +235,7 @@ async function callGemini(parts: Part[], apiKey: string, model: string): Promise
     }
     console.error('Gemini error', res.status, message)
     if (/api key/i.test(message)) throw new UserFacingError('The Gemini API key is invalid or missing.', 'bad_key', 500)
+    if (thinking && res.status === 400 && /think/i.test(message)) return callGemini(parts, apiKey, model, false)
     if (res.status === 404) {
       throw new UserFacingError(`Gemini model "${model}" isn't available for this key. Set GEMINI_MODEL in Netlify to another model (e.g. gemini-2.0-flash).`, 'bad_model', 500)
     }
@@ -248,6 +249,22 @@ async function callGemini(parts: Part[], apiKey: string, model: string): Promise
   const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? ''
   if (!text) throw new UserFacingError('Gemini returned nothing for this material.', 'empty', 422)
   return text
+}
+
+// Google renames/retires models over time. If the configured one is gone for this key, ask the API
+// which models exist and pick the newest plain "flash" model that supports generateContent.
+async function findWorkingModel(apiKey: string): Promise<string | null> {
+  const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', {
+    headers: { 'x-goog-api-key': apiKey },
+  })
+  if (!res.ok) return null
+  const data = (await res.json()) as { models?: { name: string; supportedGenerationMethods?: string[] }[] }
+  const candidates = (data.models ?? [])
+    .filter((m) => m.supportedGenerationMethods?.includes('generateContent'))
+    .map((m) => m.name.replace(/^models\//, ''))
+    .filter((n) => /^gemini-[\d.]+-flash$/.test(n))
+    .sort((a, b) => parseFloat(b.split('-')[1]) - parseFloat(a.split('-')[1]))
+  return candidates[0] ?? null
 }
 
 export default async (req: Request) => {
@@ -288,7 +305,7 @@ export default async (req: Request) => {
     .single()
   if (!mod) return json({ error: 'Module not found' }, 404)
 
-  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+  let model = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
 
   try {
     const parts = await materialParts(mod, transcript)
@@ -296,7 +313,19 @@ export default async (req: Request) => {
     for (let attempt = 0; attempt < 2; attempt++) {
       let reply: string
       try {
-        reply = await callGemini(parts, geminiKey, model)
+        try {
+          reply = await callGemini(parts, geminiKey, model)
+        } catch (e) {
+          if (e instanceof UserFacingError && e.code === 'bad_model') {
+            const alt = await findWorkingModel(geminiKey)
+            if (!alt || alt === model) throw e
+            console.log(`Model ${model} unavailable, switching to ${alt}`)
+            model = alt
+            reply = await callGemini(parts, geminiKey, model)
+          } else {
+            throw e
+          }
+        }
       } catch (e) {
         // A video Gemini can't open (private, no captions, too long) — ask for a pasted transcript instead.
         if (mod.youtube_id && !transcript.trim() && e instanceof UserFacingError && (e.code === 'unreadable' || e.code === 'empty' || e.code === 'upstream')) {
