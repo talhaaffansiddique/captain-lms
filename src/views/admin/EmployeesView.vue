@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { logActivity } from '@/lib/activity'
 import { parseEmployeeCsv, type ParsedEmployeeRow } from '@/lib/csv'
 import { loadDepartments } from '@/lib/departments'
-import { manageEmployee, isActive } from '@/lib/employees'
+import { manageEmployee, isActive, initialsOf } from '@/lib/employees'
 import type { Profile, Department } from '@/lib/database.types'
 
 const auth = useAuthStore()
@@ -230,7 +230,7 @@ async function runImport() {
             <td style="font-weight: 600">
               <RouterLink :to="`/admin/employees/${e.id}`" style="display: flex; align-items: center; gap: 10px; text-decoration: none">
                 <div class="avatar" style="width: 26px; height: 26px; font-size: 11px">
-                  {{ e.full_name.slice(0, 2).toUpperCase() }}
+                  {{ initialsOf(e.full_name) }}
                 </div>
                 {{ e.full_name }}
               </RouterLink>

@@ -6,6 +6,7 @@ import { loadTrackData, pendingMilestones } from '@/lib/quiz'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import NotificationsBell from '@/components/NotificationsBell.vue'
 import VersionTag from '@/components/VersionTag.vue'
+import { initialsOf } from '@/lib/employees'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -30,13 +31,7 @@ const links = [
   { to: '/app/account', label: 'Account', short: 'Account', icon: '⚙' },
 ]
 
-const initials = () =>
-  (auth.profile?.full_name ?? '')
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase()
+const initials = () => initialsOf(auth.profile?.full_name)
 </script>
 
 <template>

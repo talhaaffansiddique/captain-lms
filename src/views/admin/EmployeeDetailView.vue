@@ -55,6 +55,7 @@ async function saveAccount() {
   }
   await logActivity(auth.profile?.id, `Updated ${editName.value.trim()}'s account (name/role: ${editRole.value})`)
   accountMessage.value = { ok: true, text: 'Saved.' }
+  if (employeeId === auth.profile?.id) await auth.fetchProfile()
   await load()
 }
 

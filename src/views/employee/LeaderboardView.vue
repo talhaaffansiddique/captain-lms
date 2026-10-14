@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { supabase } from '@/lib/supabase'
-import { isActive } from '@/lib/employees'
+import { isActive, initialsOf } from '@/lib/employees'
 import { useAuthStore } from '@/stores/auth'
 import { loadDepartments } from '@/lib/departments'
 
@@ -83,7 +83,7 @@ const rows = computed<Row[]>(() => {
       >
         <div class="lb-rank">{{ i + 1 }}</div>
         <div class="avatar" style="width: 26px; height: 26px; font-size: 11px">
-          {{ r.full_name.slice(0, 2).toUpperCase() }}
+          {{ initialsOf(r.full_name) }}
         </div>
         <div class="lb-name">
           {{ r.full_name }}{{ r.id === auth.profile?.id ? ' (you)' : '' }}

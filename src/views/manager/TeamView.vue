@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
-import { isActive } from '@/lib/employees'
+import { isActive, initialsOf } from '@/lib/employees'
 import type { Profile } from '@/lib/database.types'
 
 const auth = useAuthStore()
@@ -23,7 +23,7 @@ onMounted(async () => {
     </div>
     <div class="card">
       <div v-for="p in team" :key="p.id" class="row-item" style="cursor: default">
-        <div class="avatar">{{ p.full_name.slice(0, 2).toUpperCase() }}</div>
+        <div class="avatar">{{ initialsOf(p.full_name) }}</div>
         <div class="row-info">
           <div class="t">{{ p.full_name }}</div>
           <div class="m" style="text-transform: capitalize">{{ p.role }}</div>

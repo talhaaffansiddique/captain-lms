@@ -3,6 +3,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import VersionTag from '@/components/VersionTag.vue'
+import { initialsOf } from '@/lib/employees'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -30,7 +31,7 @@ const links = [
       <div class="rail-foot">
         <ThemeToggle variant="mini" />
         <div class="who">
-          <div class="avatar">PN</div>
+          <div class="avatar">{{ initialsOf(auth.profile?.full_name) }}</div>
           <div>
             <div class="nm">{{ auth.profile?.full_name }}</div>
             <div class="rl">ADMIN</div>

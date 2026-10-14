@@ -36,3 +36,12 @@ export async function manageEmployee(body: {
 export function isActive(p: { is_active?: boolean }): boolean {
   return p.is_active !== false
 }
+
+/** "Talha Affan" -> "TA": first letters of the first and last words. */
+export function initialsOf(name: string | null | undefined): string {
+  const words = (name ?? '').trim().split(/\s+/).filter(Boolean)
+  if (!words.length) return '?'
+  const first = words[0]![0]!
+  const last = words.length > 1 ? words[words.length - 1]![0]! : (words[0]![1] ?? '')
+  return (first + last).toUpperCase()
+}
