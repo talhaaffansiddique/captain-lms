@@ -7,6 +7,7 @@ import { logActivity } from '@/lib/activity'
 import { loadDepartments } from '@/lib/departments'
 import { uploadModuleMaterial, documentEmbedUrl } from '@/lib/materials'
 import { MIN_QUESTIONS_TO_PUBLISH, parseBulkQuestions } from '@/lib/quiz'
+import { generateQuestions, type GeneratedQuestion } from '@/lib/generateQuestions'
 import type { Module, QuizQuestion, Department } from '@/lib/database.types'
 
 const route = useRoute()
@@ -188,6 +189,71 @@ async function saveBulk() {
   await load()
 }
 
+interface DraftQuestion extends GeneratedQuestion {
+  keep: boolean
+  editing: boolean
+}
+const generating = ref(false)
+const genError = ref('')
+const needTranscript = ref(false)
+const transcript = ref('')
+const drafts = ref<DraftQuestion[]>([])
+const genMode = ref<'add' | 'replace'>('add')
+const addingDrafts = ref(false)
+const showGeneratePrompt = ref(route.query.generate === '1')
+const aiCard = ref<HTMLElement | null>(null)
+
+const hasMaterial = computed(() => !!module_.value?.youtube_id || !!module_.value?.document_url)
+const keptCount = computed(() => drafts.value.filter((d) => d.keep).length)
+const answerSpread = computed(() => {
+  const spread = [0, 0, 0, 0]
+  for (const d of drafts.value) spread[d.correct_index] = (spread[d.correct_index] ?? 0) + 1
+  return spread
+})
+
+function scrollToGenerator() {
+  aiCard.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+async function runGenerate() {
+  generating.value = true
+  genError.value = ''
+  showGeneratePrompt.value = false
+  const result = await generateQuestions(moduleId, transcript.value)
+  generating.value = false
+  if (result.questions) {
+    needTranscript.value = false
+    drafts.value = result.questions.map((q) => ({ ...q, keep: true, editing: false }))
+    return
+  }
+  genError.value = result.error ?? 'Could not generate questions.'
+  needTranscript.value = result.code === 'need_transcript'
+}
+
+async function addDrafts() {
+  const chosen = drafts.value.filter((d) => d.keep)
+  if (!chosen.length) return
+  if (chosen.some((d) => !d.question.trim() || d.options.some((o) => !o.trim()))) {
+    genError.value = 'Fill in every question and option (or untick the ones you don’t want).'
+    return
+  }
+  addingDrafts.value = true
+  if (genMode.value === 'replace') await supabase.from('quiz_questions').delete().eq('module_id', moduleId)
+  await supabase.from('quiz_questions').insert(
+    chosen.map((d) => ({
+      module_id: moduleId,
+      question: d.question.trim(),
+      options: d.options.map((o) => o.trim()),
+      correct_index: d.correct_index,
+    })),
+  )
+  await logActivity(auth.profile?.id, `Generated ${chosen.length} questions with AI for "${module_.value?.title}"`)
+  drafts.value = []
+  genError.value = ''
+  addingDrafts.value = false
+  await load()
+}
+
 async function togglePublish() {
   if (!module_.value) return
   if (module_.value.is_draft && !canPublish.value) return
@@ -340,6 +406,90 @@ async function saveSchedule() {
       <button class="btn btn-ghost btn-sm" :disabled="savingSchedule" @click="saveSchedule">
         {{ savingSchedule ? 'Saving…' : 'Save schedule' }}
       </button>
+    </div>
+
+    <div v-if="showGeneratePrompt && hasMaterial" class="card" style="padding: 14px 18px; margin-bottom: 16px; border-color: var(--brass); background: var(--brass-soft)">
+      <strong>Module saved.</strong> Want questions drafted automatically from the uploaded material?
+      <button class="btn btn-primary btn-sm" style="margin-left: 8px" @click="scrollToGenerator">✨ Generate questions</button>
+      <button class="btn btn-ghost btn-sm" style="margin-left: 4px" @click="showGeneratePrompt = false">Not now</button>
+    </div>
+
+    <div ref="aiCard" class="card" style="padding: 18px; margin-bottom: 20px; border: 1.5px solid var(--brass)">
+      <div class="panel-title" style="padding: 0 0 6px">
+        <h3>✨ Generate questions from this material</h3>
+        <span class="pill pill-teal">Google Gemini · free tier</span>
+      </div>
+      <p class="hint" style="margin-bottom: 10px">
+        <template v-if="module_.youtube_id">The AI watches the video (its captions) and drafts questions from it.</template>
+        <template v-else-if="module_.document_url">The AI reads the uploaded {{ module_.document_type?.toUpperCase() }} and drafts questions from its text.</template>
+        <template v-else>Attach a video or document above first — the questions are drafted from it.</template>
+        Always review them before adding — nothing reaches employees until you publish.
+      </p>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center">
+        <span class="pill pill-teal">5 easy</span>
+        <span class="pill pill-brass">6 medium</span>
+        <span class="pill pill-danger">4 hard</span>
+        <span class="hint">15 questions · 4 options each · one correct answer</span>
+      </div>
+
+      <div v-if="needTranscript" class="field" style="margin-top: 12px">
+        <label>Paste the video transcript (YouTube: ⋯ → Show transcript → copy)</label>
+        <textarea v-model="transcript" rows="5" style="width: 100%" placeholder="Paste transcript here…" />
+      </div>
+
+      <div style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: center">
+        <button class="btn btn-primary btn-sm" :disabled="generating || !hasMaterial || (needTranscript && !transcript.trim())" @click="runGenerate">
+          {{ generating ? 'Reading the material…' : drafts.length ? '↻ Regenerate' : '✨ Generate questions' }}
+        </button>
+        <select v-model="genMode" style="width: auto">
+          <option value="add">Add to existing questions</option>
+          <option value="replace">Replace existing questions</option>
+        </select>
+      </div>
+      <p v-if="generating" class="hint" style="margin-top: 8px">This can take 10–30 seconds.</p>
+      <p v-if="genError" class="hint" style="color: var(--danger); margin-top: 8px">{{ genError }}</p>
+
+      <div v-if="drafts.length" style="margin-top: 16px">
+        <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px">
+          <span class="pill pill-outline">Correct answers: A {{ answerSpread[0] }} · B {{ answerSpread[1] }} · C {{ answerSpread[2] }} · D {{ answerSpread[3] }}</span>
+        </div>
+        <div
+          v-for="(d, i) in drafts"
+          :key="i"
+          class="card"
+          style="padding: 12px 14px; margin-bottom: 8px"
+          :style="{ opacity: d.keep ? 1 : 0.45 }"
+        >
+          <div style="display: flex; gap: 10px; align-items: flex-start">
+            <input v-model="d.keep" type="checkbox" style="width: auto; margin-top: 4px" />
+            <div style="flex: 1">
+              <input v-if="d.editing" v-model="d.question" type="text" />
+              <div v-else style="font-weight: 600">{{ i + 1 }}. {{ d.question }}</div>
+            </div>
+            <span :class="['pill', d.difficulty === 'easy' ? 'pill-teal' : d.difficulty === 'hard' ? 'pill-danger' : 'pill-brass']">{{ d.difficulty }}</span>
+            <button class="btn btn-ghost btn-sm" @click="d.editing = !d.editing">{{ d.editing ? 'Done' : 'Edit' }}</button>
+          </div>
+          <div style="margin: 8px 0 0 26px; display: grid; gap: 4px">
+            <div v-for="(opt, oi) in d.options" :key="oi" style="display: flex; align-items: center; gap: 6px; font-size: 13px">
+              <template v-if="d.editing">
+                <input type="radio" :checked="d.correct_index === oi" @change="d.correct_index = oi" />
+                <input v-model="d.options[oi]" type="text" style="flex: 1" />
+              </template>
+              <template v-else>
+                <span :style="{ fontWeight: oi === d.correct_index ? 700 : 400, color: oi === d.correct_index ? 'var(--teal)' : 'inherit' }">
+                  {{ ['A', 'B', 'C', 'D'][oi] }}) {{ opt }}{{ oi === d.correct_index ? ' ✓' : '' }}
+                </span>
+              </template>
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center; margin-top: 10px">
+          <button class="btn btn-primary btn-sm" :disabled="addingDrafts || !keptCount" @click="addDrafts">
+            {{ addingDrafts ? 'Adding…' : `Add ${keptCount} to question bank` }}
+          </button>
+          <span class="hint">{{ keptCount }} of {{ drafts.length }} selected</span>
+        </div>
+      </div>
     </div>
 
     <div class="card" style="padding: 18px; margin-bottom: 20px">

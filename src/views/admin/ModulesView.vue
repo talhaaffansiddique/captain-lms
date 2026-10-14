@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
 import { loadDepartments } from '@/lib/departments'
@@ -8,6 +9,7 @@ import { MIN_QUESTIONS_TO_PUBLISH } from '@/lib/quiz'
 import type { Module, Department } from '@/lib/database.types'
 
 const auth = useAuthStore()
+const router = useRouter()
 const modules = ref<Module[]>([])
 const questionCounts = ref<Record<number, number>>({})
 const title = ref('')
@@ -90,11 +92,17 @@ async function createDraft() {
     }
   }
 
+  const hasMaterial = (materialType.value === 'video' && !!youtubeId.value.trim()) || (materialType.value === 'document' && !!documentFile.value)
+  const needsQuiz = department.value !== 'General' || quizRequired.value
   title.value = ''
   youtubeId.value = ''
   documentFile.value = null
   quizRequired.value = true
   saving.value = false
+  if (hasMaterial && needsQuiz && !createError.value) {
+    await router.push(`/admin/modules/${inserted.id}?generate=1`)
+    return
+  }
   await loadModules()
 }
 
