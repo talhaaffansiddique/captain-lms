@@ -9,7 +9,7 @@ import { useSort } from '@/composables/useSort'
 import { uploadModuleMaterial, formatDuration, deleteMaterialFile } from '@/lib/materials'
 import { logActivity } from '@/lib/activity'
 import { MIN_QUESTIONS_TO_PUBLISH } from '@/lib/quiz'
-import type { Module, Department } from '@/lib/database.types'
+import type { Module, Department, Course } from '@/lib/database.types'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -21,6 +21,8 @@ const youtubeId = ref('')
 const materialType = ref<'video' | 'document'>('video')
 const documentFile = ref<File | null>(null)
 const quizRequired = ref(true)
+const courseId = ref<number | ''>('')
+const courseOptions = ref<Pick<Course, 'id' | 'title'>[]>([])
 const saving = ref(false)
 const createError = ref('')
 
@@ -50,6 +52,8 @@ async function loadModules() {
 onMounted(async () => {
   const [, depts] = await Promise.all([loadModules(), loadDepartments()])
   departments.value = depts
+  const { data: cs } = await supabase.from('courses').select('id, title').order('title')
+  courseOptions.value = (cs ?? []) as Pick<Course, 'id' | 'title'>[]
   if (!department.value) department.value = 'General'
 })
 
@@ -90,6 +94,7 @@ async function createDraft() {
       youtube_id: parsedYoutubeId,
       quiz_required: department.value === 'General' ? quizRequired.value : true,
       is_draft: true,
+      ...(courseId.value ? { course_id: courseId.value } : {}),
       created_by: auth.profile?.id,
     })
     .select()
@@ -116,6 +121,7 @@ async function createDraft() {
   youtubeId.value = ''
   documentFile.value = null
   quizRequired.value = true
+  courseId.value = ''
   saving.value = false
   if (hasMaterial && needsQuiz && !createError.value) {
     await router.push(`/admin/modules/${inserted.id}?generate=1`)
@@ -198,6 +204,13 @@ This also removes its questions, its uploaded file, and every employee's complet
         <select v-model="department">
           <option value="General">General</option>
           <option v-for="d in departments" :key="d.id" :value="d.name">{{ d.name }}</option>
+        </select>
+      </div>
+      <div v-if="courseOptions.length" class="field">
+        <label>Course (optional)</label>
+        <select v-model="courseId">
+          <option value="">No course yet</option>
+          <option v-for="c in courseOptions" :key="c.id" :value="c.id">{{ c.title }}</option>
         </select>
       </div>
       <div v-if="department === 'General'" class="field">

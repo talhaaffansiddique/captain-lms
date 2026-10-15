@@ -8,6 +8,17 @@ export interface ReleaseNote {
 // Newest first. Add a new entry here whenever APP_VERSION is bumped in version.ts.
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'v4.1',
+    date: '2026-10-15',
+    title: 'Revamp phases 2-3: courses, catalog and course player',
+    changes: [
+      'New Course catalog with colourful course cards, category filters and search.',
+      'Courses group lessons (modules); admins manage them in Admin → Courses, including colour, category, publishing and lesson order.',
+      'New course player: lesson list with progress, previous/next lesson, and a practice quiz drawn from the course\'s question banks.',
+      'Needs the one-time SQL in supabase/revamp-v4.sql; until it is run, one automatic course per audience is shown.',
+    ],
+  },
+  {
     version: 'v4.0',
     date: '2026-10-15',
     title: 'Revamp phase 1: new design system',

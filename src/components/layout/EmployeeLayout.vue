@@ -24,10 +24,11 @@ async function logout() {
 }
 
 const links = [
-  { to: '/app/dashboard', label: 'Dashboard', short: 'Home', icon: '●' },
-  { to: '/app/modules', label: 'Modules', short: 'Modules', icon: '▤', dot: true },
-  { to: '/app/badges', label: 'My Badges', short: 'Badges', icon: '★' },
-  { to: '/app/leaderboard', label: 'Leaderboard', short: 'Board', icon: '▲' },
+  { to: '/app/dashboard', label: 'Dashboard', short: 'Home', icon: '▦' },
+  { to: '/app/catalog', label: 'Course catalog', short: 'Courses', icon: '▤' },
+  { to: '/app/modules', label: 'My learning', short: 'Learning', icon: '▶', dot: true },
+  { to: '/app/badges', label: 'Certificates & badges', short: 'Badges', icon: '🏆' },
+  { to: '/app/leaderboard', label: 'Leaderboard', short: 'Board', icon: '🏅' },
   { to: '/app/account', label: 'Account', short: 'Account', icon: '⚙' },
 ]
 

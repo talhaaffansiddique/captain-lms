@@ -26,7 +26,19 @@ export interface Module {
   is_draft: boolean
   scheduled_date: string | null
   is_archived: boolean
+  course_id?: number | null
+  lesson_order?: number
   created_by: string | null
+  created_at: string
+}
+
+export interface Course {
+  id: number
+  title: string
+  category: string
+  description: string | null
+  color: string
+  is_published: boolean
   created_at: string
 }
 
@@ -46,6 +58,7 @@ export interface VideoCompletion {
   watched_seconds: number
   completed: boolean
   completed_at: string | null
+  last_watched_at?: string | null
 }
 
 export interface QuizAttempt {
@@ -136,6 +149,7 @@ export interface Database {
         Update: Partial<ActivityLogEntry>
       }
       departments: { Row: Department; Insert: Partial<Department>; Update: Partial<Department> }
+      courses: { Row: Course; Insert: Partial<Course>; Update: Partial<Course> }
     }
   }
 }

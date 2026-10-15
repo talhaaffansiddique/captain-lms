@@ -16,7 +16,8 @@ async function logout() {
 const links = [
   { to: '/admin/overview', label: 'Overview', short: 'Overview', icon: '■' },
   { to: '/admin/employees', label: 'Employees', short: 'People', icon: '👥' },
-  { to: '/admin/modules', label: 'Modules', short: 'Modules', icon: '▤' },
+  { to: '/admin/courses', label: 'Courses', short: 'Courses', icon: '🎓' },
+  { to: '/admin/modules', label: 'Modules (lessons)', short: 'Lessons', icon: '▤' },
   { to: '/admin/audiences', label: 'Audiences', short: 'Audiences', icon: '🏷️' },
   { to: '/admin/release-notes', label: 'Release notes', short: 'Releases', icon: '📝' },
 ]

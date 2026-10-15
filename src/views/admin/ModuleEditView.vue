@@ -9,7 +9,7 @@ import { parseYoutubeId } from '@/lib/youtube'
 import { uploadModuleMaterial, documentEmbedUrl, deleteMaterialFile } from '@/lib/materials'
 import { MIN_QUESTIONS_TO_PUBLISH, parseBulkQuestions } from '@/lib/quiz'
 import { generateQuestions, type GeneratedQuestion } from '@/lib/generateQuestions'
-import type { Module, QuizQuestion, Department } from '@/lib/database.types'
+import type { Module, QuizQuestion, Department, Course } from '@/lib/database.types'
 
 const route = useRoute()
 const router = useRouter()
@@ -25,6 +25,8 @@ const detailTitle = ref('')
 const detailDepartment = ref('')
 const detailYoutubeId = ref('')
 const detailQuizRequired = ref(true)
+const detailCourse = ref<number | ''>('')
+const courseOptions = ref<Pick<Course, 'id' | 'title'>[]>([])
 const savingDetails = ref(false)
 
 const newQuestion = ref('')
@@ -51,11 +53,13 @@ const savingEdit = ref(false)
 
 async function load() {
   loading.value = true
-  const [{ data: mod }, { data: qs }, depts] = await Promise.all([
+  const [{ data: mod }, { data: qs }, depts, { data: cs }] = await Promise.all([
     supabase.from('modules').select('*').eq('id', moduleId).single(),
     supabase.from('quiz_questions').select('*').eq('module_id', moduleId).order('id'),
     loadDepartments(),
+    supabase.from('courses').select('id, title').order('title'),
   ])
+  courseOptions.value = (cs ?? []) as Pick<Course, 'id' | 'title'>[]
   module_.value = mod
   questions.value = qs ?? []
   scheduledDate.value = mod?.scheduled_date ?? ''
@@ -64,6 +68,7 @@ async function load() {
   detailDepartment.value = mod?.department ?? 'General'
   detailYoutubeId.value = mod?.youtube_id ?? ''
   detailQuizRequired.value = mod?.quiz_required ?? true
+  detailCourse.value = mod?.course_id ?? ''
   loading.value = false
 }
 
@@ -84,6 +89,7 @@ async function saveDetails() {
       title: detailTitle.value.trim(),
       department: detailDepartment.value,
       youtube_id: youtubeId,
+      ...(courseOptions.value.length ? { course_id: detailCourse.value || null } : {}),
       // Only meaningful for General modules — department modules always have a quiz via the
       // 5-module grouping, so this is ignored for them either way.
       quiz_required: detailDepartment.value === 'General' ? detailQuizRequired.value : true,
@@ -399,6 +405,13 @@ async function saveSchedule() {
       <div class="field">
         <label>YouTube video ID</label>
         <input v-model="detailYoutubeId" type="text" placeholder="e.g. dQw4w9WgXcQ" />
+      </div>
+      <div v-if="courseOptions.length" class="field">
+        <label>Course</label>
+        <select v-model="detailCourse">
+          <option value="">No course</option>
+          <option v-for="c in courseOptions" :key="c.id" :value="c.id">{{ c.title }}</option>
+        </select>
       </div>
       <div class="field">
         <label>Audience</label>

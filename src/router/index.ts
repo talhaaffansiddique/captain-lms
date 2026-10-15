@@ -23,6 +23,11 @@ const router = createRouter({
           component: () => import('@/views/employee/DashboardView.vue'),
         },
         {
+          path: 'catalog',
+          name: 'employee-catalog',
+          component: () => import('@/views/employee/CatalogView.vue'),
+        },
+        {
           path: 'modules',
           name: 'employee-modules',
           component: () => import('@/views/employee/ModulesView.vue'),
@@ -79,6 +84,16 @@ const router = createRouter({
           path: 'employees/:id',
           name: 'admin-employee-detail',
           component: () => import('@/views/admin/EmployeeDetailView.vue'),
+        },
+        {
+          path: 'courses',
+          name: 'admin-courses',
+          component: () => import('@/views/admin/CoursesView.vue'),
+        },
+        {
+          path: 'courses/:id',
+          name: 'admin-course-edit',
+          component: () => import('@/views/admin/CourseEditView.vue'),
         },
         {
           path: 'audiences',
