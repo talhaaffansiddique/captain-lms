@@ -85,7 +85,7 @@ function formattedDate(iso: string) {
   margin-bottom: 8px;
 }
 .cert-kicker {
-  font: 600 12px 'Public Sans';
+  font: 600 12px 'Plus Jakarta Sans';
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--ink-soft);

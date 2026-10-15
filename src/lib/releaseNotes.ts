@@ -8,6 +8,16 @@ export interface ReleaseNote {
 // Newest first. Add a new entry here whenever APP_VERSION is bumped in version.ts.
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'v4.0',
+    date: '2026-10-15',
+    title: 'Revamp phase 1: new design system',
+    changes: [
+      'New look across the whole app: navy sidebar, light content area, blue and orange accents, rounded cards and a new font.',
+      'Dark mode kept and refreshed to match.',
+      'Redesigned sign-in screen.',
+    ],
+  },
+  {
     version: 'v3.1',
     date: '2026-10-15',
     title: 'Sortable tables',

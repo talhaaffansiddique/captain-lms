@@ -152,7 +152,7 @@ function handleClick(n: Notification) {
   padding: 10px 0;
   font-size: 13.5px;
   color: var(--ink);
-  font-family: 'Public Sans', sans-serif;
+  font-family: 'Plus Jakarta Sans', sans-serif;
 }
 .notif-row:first-child {
   border-top: none;

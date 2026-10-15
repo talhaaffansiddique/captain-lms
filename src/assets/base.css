@@ -1,57 +1,74 @@
-/* ---------- Captain LMS design tokens (ported from the click-through demo) ---------- */
+/* ---------- Captain LMS design tokens (revamp: navy sidebar, light content, blue + orange accents) ----------
+   The old brass/teal token names are kept so every existing screen picks up the new palette:
+   --brass* is now the orange accent, --teal* is now green, and --blue* is the new primary colour. */
 :root {
-  --ink: #17203a;
-  --ink-soft: #3c4560;
-  --paper: #f1f2f6;
+  --ink: #0f1a2e;
+  --ink-soft: #55607a;
+  --paper: #f4f5f9;
   --surface: #ffffff;
-  --surface-sunken: #e8e9ef;
-  --border: #d7d9e3;
-  --brass: #a9761f;
-  --brass-strong: #8a5f16;
-  --brass-soft: #f3e6cd;
-  --teal: #1f6f63;
-  --teal-soft: #dcede9;
-  --danger: #a8412f;
-  --danger-soft: #f3e0db;
-  --shadow: 0 1px 2px rgba(23, 32, 58, 0.06), 0 8px 24px -12px rgba(23, 32, 58, 0.18);
+  --surface-sunken: #eef0f7;
+  --border: #e3e6ef;
+  --blue: #2f5be8;
+  --blue-soft: #e6ecfd;
+  --brass: #f08a24;
+  --brass-strong: #b45f0a;
+  --brass-soft: #fdf0e2;
+  --teal: #15803d;
+  --teal-soft: #e2f4e8;
+  --danger: #c0392b;
+  --danger-soft: #fbe7e4;
+  --rail: #0f1b33;
+  --rail-active: #2b3d66;
+  --rail-ink: #b9c3dc;
+  --shadow: 0 1px 2px rgba(15, 26, 46, 0.05), 0 8px 28px -14px rgba(15, 26, 46, 0.18);
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --ink: #eef0f6;
-    --ink-soft: #b7bcd2;
-    --paper: #12141f;
-    --surface: #1a1d2b;
-    --surface-sunken: #1f2333;
-    --border: #2e3346;
-    --brass: #d7a83f;
-    --brass-strong: #eec26a;
-    --brass-soft: #33291a;
-    --teal: #5cba9f;
-    --teal-soft: #193029;
-    --danger: #e08975;
-    --danger-soft: #3a2320;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 28px -14px rgba(0, 0, 0, 0.6);
+    --ink: #eef1fa;
+    --ink-soft: #9aa6c4;
+    --paper: #0b1020;
+    --surface: #141b30;
+    --surface-sunken: #1a2340;
+    --border: #26304f;
+    --blue: #6b8cff;
+    --blue-soft: #1b2750;
+    --brass: #f5a04a;
+    --brass-strong: #f5a04a;
+    --brass-soft: #3a2a17;
+    --teal: #4ade80;
+    --teal-soft: #12301f;
+    --danger: #f08074;
+    --danger-soft: #3a1f1c;
+    --rail: #080d1b;
+    --rail-active: #1f2c52;
+    --rail-ink: #9aa6c4;
+    --shadow: 0 8px 28px -14px rgba(0, 0, 0, 0.6);
     color-scheme: dark;
   }
 }
 
 :root[data-theme='dark'] {
-  --ink: #eef0f6;
-  --ink-soft: #b7bcd2;
-  --paper: #12141f;
-  --surface: #1a1d2b;
-  --surface-sunken: #1f2333;
-  --border: #2e3346;
-  --brass: #d7a83f;
-  --brass-strong: #eec26a;
-  --brass-soft: #33291a;
-  --teal: #5cba9f;
-  --teal-soft: #193029;
-  --danger: #e08975;
-  --danger-soft: #3a2320;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 28px -14px rgba(0, 0, 0, 0.6);
+  --ink: #eef1fa;
+  --ink-soft: #9aa6c4;
+  --paper: #0b1020;
+  --surface: #141b30;
+  --surface-sunken: #1a2340;
+  --border: #26304f;
+  --blue: #6b8cff;
+  --blue-soft: #1b2750;
+  --brass: #f5a04a;
+  --brass-strong: #f5a04a;
+  --brass-soft: #3a2a17;
+  --teal: #4ade80;
+  --teal-soft: #12301f;
+  --danger: #f08074;
+  --danger-soft: #3a1f1c;
+  --rail: #080d1b;
+  --rail-active: #1f2c52;
+  --rail-ink: #9aa6c4;
+  --shadow: 0 8px 28px -14px rgba(0, 0, 0, 0.6);
   color-scheme: dark;
 }
 
@@ -65,10 +82,12 @@ body {
   background: var(--paper);
   color: var(--ink);
   font-family:
-    'Public Sans',
+    'Plus Jakarta Sans',
     ui-sans-serif,
     system-ui,
     sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
 }
@@ -77,13 +96,13 @@ h1,
 h2,
 h3 {
   font-family:
-    'Newsreader',
-    ui-serif,
-    Georgia,
-    serif;
-  font-weight: 600;
+    'Plus Jakarta Sans',
+    ui-sans-serif,
+    system-ui,
+    sans-serif;
+  font-weight: 800;
   text-wrap: balance;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
 }
 
 a {

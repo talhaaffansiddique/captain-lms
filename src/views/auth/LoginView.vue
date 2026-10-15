@@ -137,7 +137,7 @@ async function submit() {
   max-width: 860px;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  border-radius: 16px;
+  border-radius: 24px;
   overflow: hidden;
   box-shadow: var(--shadow);
   border: 1px solid var(--border);
@@ -152,8 +152,9 @@ async function submit() {
 }
 .auth-visual {
   background:
-    radial-gradient(circle at 20% 20%, color-mix(in srgb, var(--brass) 20%, transparent), transparent 55%),
-    linear-gradient(160deg, #161c30, #232c4d 60%, #161c30);
+    radial-gradient(circle at 85% 15%, rgba(47, 91, 232, 0.55), transparent 55%),
+    radial-gradient(circle at 10% 95%, rgba(240, 138, 36, 0.28), transparent 45%),
+    linear-gradient(160deg, #0f1b33, #16264a 60%, #0f1b33);
   color: #f1f2f6;
   padding: 40px;
   display: flex;
@@ -166,7 +167,7 @@ async function submit() {
   font-weight: 500;
   font-size: 19px;
   line-height: 1.45;
-  color: #f6f0e2;
+  color: #fff;
 }
 .badge-strip {
   display: flex;
@@ -176,8 +177,8 @@ async function submit() {
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--brass) 35%, #1a1400);
-  border: 1px solid rgba(238, 194, 106, 0.5);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.25);
   display: grid;
   place-items: center;
   font-size: 16px;
