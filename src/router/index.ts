@@ -143,6 +143,12 @@ const router = createRouter({
           component: () => import('@/views/manager/OverviewView.vue'),
         },
         {
+          path: 'heatmap',
+          name: 'manager-heatmap',
+          meta: { widget: 'mgr.heatmap' },
+          component: () => import('@/views/manager/HeatmapView.vue'),
+        },
+        {
           path: 'team',
           name: 'manager-team',
           component: () => import('@/views/manager/TeamView.vue'),

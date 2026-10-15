@@ -8,6 +8,17 @@ export interface ReleaseNote {
 // Newest first. Add a new entry here whenever APP_VERSION is bumped in version.ts.
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'v4.3',
+    date: '2026-10-15',
+    title: 'Revamp phase 5: admin analytics and manager team views',
+    changes: [
+      'Admin Overview is now Analytics: company stat tiles, completion by department, a course funnel (switch between Compare and Rates), a when-people-learn heatmap, compliance tracker with Remind all overdue, and content health.',
+      'Manager Team progress with status filters, sortable progress table and at-risk / overdue flags, plus a Team heatmap of people by course.',
+      'Each widget can be hidden per role in Admin → Dashboard settings.',
+      'Managers and admins reading team activity needs the one-time SQL in supabase/revamp-v4.sql.',
+    ],
+  },
+  {
     version: 'v4.2',
     date: '2026-10-15',
     title: 'Revamp phase 4: learner dashboard, leaderboard podium and deadlines',

@@ -1,22 +1,28 @@
 <script setup lang="ts">
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import VersionTag from '@/components/VersionTag.vue'
 import { initialsOf } from '@/lib/employees'
+import { useWidgetsStore } from '@/stores/widgets'
 
 const auth = useAuthStore()
 const router = useRouter()
+const widgets = useWidgetsStore()
+onMounted(() => void widgets.load())
 
 async function logout() {
   await auth.signOut()
   router.push('/login')
 }
 
-const links = [
-  { to: '/manager/overview', label: 'Overview', short: 'Overview', icon: '■' },
+const allLinks = [
+  { to: '/manager/overview', label: 'Team progress', short: 'Progress', icon: '▦' },
+  { to: '/manager/heatmap', label: 'Team heatmap', short: 'Heatmap', icon: '🔥', widget: 'mgr.heatmap' },
   { to: '/manager/team', label: 'My Team', short: 'Team', icon: '👥' },
 ]
+const links = computed(() => allLinks.filter((l) => !('widget' in l) || widgets.isVisible(l.widget as string)))
 </script>
 
 <template>
