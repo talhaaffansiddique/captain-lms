@@ -86,6 +86,11 @@ const router = createRouter({
           component: () => import('@/views/admin/AudiencesView.vue'),
         },
         {
+          path: 'release-notes',
+          name: 'admin-release-notes',
+          component: () => import('@/views/admin/ReleaseNotesView.vue'),
+        },
+        {
           path: 'modules',
           name: 'admin-modules',
           component: () => import('@/views/admin/ModulesView.vue'),

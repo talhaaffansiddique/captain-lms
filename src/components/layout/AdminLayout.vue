@@ -18,6 +18,7 @@ const links = [
   { to: '/admin/employees', label: 'Employees', short: 'People', icon: '👥' },
   { to: '/admin/modules', label: 'Modules', short: 'Modules', icon: '▤' },
   { to: '/admin/audiences', label: 'Audiences', short: 'Audiences', icon: '🏷️' },
+  { to: '/admin/release-notes', label: 'Release notes', short: 'Releases', icon: '📝' },
 ]
 </script>
 
