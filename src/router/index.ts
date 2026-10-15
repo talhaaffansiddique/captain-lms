@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useWidgetsStore } from '@/stores/widgets'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -45,6 +46,7 @@ const router = createRouter({
         {
           path: 'badges',
           name: 'employee-badges',
+          meta: { widget: 'emp.certs' },
           component: () => import('@/views/employee/BadgesView.vue'),
         },
         {
@@ -53,8 +55,15 @@ const router = createRouter({
           component: () => import('@/views/employee/CertificateView.vue'),
         },
         {
+          path: 'calendar',
+          name: 'employee-calendar',
+          meta: { widget: 'emp.calendar' },
+          component: () => import('@/views/employee/CalendarView.vue'),
+        },
+        {
           path: 'leaderboard',
           name: 'employee-leaderboard',
+          meta: { widget: 'emp.leaderboard' },
           component: () => import('@/views/employee/LeaderboardView.vue'),
         },
         {
@@ -99,6 +108,11 @@ const router = createRouter({
           path: 'audiences',
           name: 'admin-audiences',
           component: () => import('@/views/admin/AudiencesView.vue'),
+        },
+        {
+          path: 'dashboard-settings',
+          name: 'admin-dashboard-settings',
+          component: () => import('@/views/admin/DashboardSettingsView.vue'),
         },
         {
           path: 'release-notes',
@@ -152,6 +166,13 @@ router.beforeEach(async (to) => {
     if (auth.role === 'admin') return '/admin'
     if (auth.role === 'manager') return '/manager'
     return '/app'
+  }
+  // A page whose widget an admin has hidden is no longer reachable, even by typing its address.
+  const widgetId = to.meta.widget as string | undefined
+  if (widgetId) {
+    const widgets = useWidgetsStore()
+    if (!widgets.loaded) await widgets.load()
+    if (!widgets.isVisible(widgetId)) return auth.role === 'manager' ? '/manager' : auth.role === 'admin' ? '/admin' : '/app'
   }
   return true
 })

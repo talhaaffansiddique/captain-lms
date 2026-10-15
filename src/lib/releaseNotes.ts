@@ -8,6 +8,18 @@ export interface ReleaseNote {
 // Newest first. Add a new entry here whenever APP_VERSION is bumped in version.ts.
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'v4.2',
+    date: '2026-10-15',
+    title: 'Revamp phase 4: learner dashboard, leaderboard podium and deadlines',
+    changes: [
+      'New employee dashboard: continue-learning card, stat tiles with learning streak, My courses, due this week and recent activity.',
+      'Weekly goal in the sidebar, fed by study time recorded while you watch lessons.',
+      'Leaderboard redesigned as a podium for the top three, with your own row highlighted.',
+      'New Deadlines calendar showing your due date, quizzes ready and what you\'ve completed.',
+      'New Admin → Dashboard settings page: switch each widget on or off per role (Employee, Manager, Admin); hidden pages disappear from the menu.',
+    ],
+  },
+  {
     version: 'v4.1',
     date: '2026-10-15',
     title: 'Revamp phases 2-3: courses, catalog and course player',

@@ -3,9 +3,13 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import VersionTag from '@/components/VersionTag.vue'
+import { onMounted } from 'vue'
+import { useWidgetsStore } from '@/stores/widgets'
 import { initialsOf } from '@/lib/employees'
 
 const auth = useAuthStore()
+const widgets = useWidgetsStore()
+onMounted(() => void widgets.load())
 const router = useRouter()
 
 async function logout() {
@@ -19,6 +23,7 @@ const links = [
   { to: '/admin/courses', label: 'Courses', short: 'Courses', icon: '🎓' },
   { to: '/admin/modules', label: 'Modules (lessons)', short: 'Lessons', icon: '▤' },
   { to: '/admin/audiences', label: 'Audiences', short: 'Audiences', icon: '🏷️' },
+  { to: '/admin/dashboard-settings', label: 'Dashboard settings', short: 'Widgets', icon: '⚙' },
   { to: '/admin/release-notes', label: 'Release notes', short: 'Releases', icon: '📝' },
 ]
 </script>

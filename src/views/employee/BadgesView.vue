@@ -29,7 +29,7 @@ onMounted(async () => {
   <div>
     <div class="topline">
       <div>
-        <h2>My Badges</h2>
+        <h2>Certificates & badges</h2>
         <p>Earned by passing each milestone quiz — click an unlocked badge to view its certificate.</p>
       </div>
     </div>
