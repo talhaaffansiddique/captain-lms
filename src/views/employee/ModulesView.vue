@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
 import { materialType, formatDuration } from '@/lib/materials'
+import { useSort } from '@/composables/useSort'
 import type { Module, VideoCompletion } from '@/lib/database.types'
 
 const auth = useAuthStore()
@@ -31,6 +32,14 @@ function isDone(moduleId: number) {
 const filteredModules = computed(() =>
   audienceFilter.value === 'All' ? modules.value : modules.value.filter((m) => m.department === audienceFilter.value),
 )
+
+const { sorted: sortedModules, toggle, indicator, ariaSort } = useSort(filteredModules, {
+  title: (m) => m.title,
+  audience: (m) => m.department,
+  type: (m) => materialType(m),
+  duration: (m) => (m.youtube_id ? m.duration_seconds : null),
+  status: (m) => (isDone(m.id) ? 0 : 1),
+})
 </script>
 
 <template>
@@ -71,15 +80,25 @@ const filteredModules = computed(() =>
       <table>
         <thead>
           <tr>
-            <th>Title</th>
-            <th>Audience</th>
-            <th>Type</th>
-            <th>Duration</th>
-            <th>Status</th>
+            <th class="sortable" :aria-sort="ariaSort('title')" @click="toggle('title')">
+              Title <span class="sort-ind">{{ indicator('title') }}</span>
+            </th>
+            <th class="sortable" :aria-sort="ariaSort('audience')" @click="toggle('audience')">
+              Audience <span class="sort-ind">{{ indicator('audience') }}</span>
+            </th>
+            <th class="sortable" :aria-sort="ariaSort('type')" @click="toggle('type')">
+              Type <span class="sort-ind">{{ indicator('type') }}</span>
+            </th>
+            <th class="sortable" :aria-sort="ariaSort('duration')" @click="toggle('duration')">
+              Duration <span class="sort-ind">{{ indicator('duration') }}</span>
+            </th>
+            <th class="sortable" :aria-sort="ariaSort('status')" @click="toggle('status')">
+              Status <span class="sort-ind">{{ indicator('status') }}</span>
+            </th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="m in filteredModules" :key="m.id" style="cursor: pointer" @click="router.push(`/app/modules/${m.id}`)">
+          <tr v-for="m in sortedModules" :key="m.id" style="cursor: pointer" @click="router.push(`/app/modules/${m.id}`)">
             <td style="font-weight: 600">
               <RouterLink :to="`/app/modules/${m.id}`" style="text-decoration: none">{{ m.title }}</RouterLink>
             </td>

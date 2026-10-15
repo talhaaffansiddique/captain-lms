@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
 import { loadDepartments } from '@/lib/departments'
 import { parseYoutubeId } from '@/lib/youtube'
+import { useSort } from '@/composables/useSort'
 import { uploadModuleMaterial, formatDuration, deleteMaterialFile } from '@/lib/materials'
 import { logActivity } from '@/lib/activity'
 import { MIN_QUESTIONS_TO_PUBLISH } from '@/lib/quiz'
@@ -24,6 +25,16 @@ const saving = ref(false)
 const createError = ref('')
 
 const departments = ref<Department[]>([])
+
+const todayIso = new Date().toISOString().slice(0, 10)
+const statusRank = (m: Module) => (m.is_draft ? 2 : m.scheduled_date && m.scheduled_date > todayIso ? 1 : 0)
+const { sorted: sortedModules, toggle, indicator, ariaSort } = useSort(modules, {
+  title: (m) => m.title,
+  type: (m) => materialTypeLabel(m),
+  duration: (m) => (m.youtube_id ? m.duration_seconds : null),
+  audience: (m) => m.department,
+  status: (m) => statusRank(m),
+})
 
 async function loadModules() {
   const [{ data: modData }, { data: qData }] = await Promise.all([
@@ -206,16 +217,26 @@ This also removes its questions, its uploaded file, and every employee's complet
       <table>
         <thead>
           <tr>
-            <th>Title</th>
-            <th>Type</th>
-            <th>Duration</th>
-            <th>Audience</th>
-            <th>Status</th>
+            <th class="sortable" :aria-sort="ariaSort('title')" @click="toggle('title')">
+              Title <span class="sort-ind">{{ indicator('title') }}</span>
+            </th>
+            <th class="sortable" :aria-sort="ariaSort('type')" @click="toggle('type')">
+              Type <span class="sort-ind">{{ indicator('type') }}</span>
+            </th>
+            <th class="sortable" :aria-sort="ariaSort('duration')" @click="toggle('duration')">
+              Duration <span class="sort-ind">{{ indicator('duration') }}</span>
+            </th>
+            <th class="sortable" :aria-sort="ariaSort('audience')" @click="toggle('audience')">
+              Audience <span class="sort-ind">{{ indicator('audience') }}</span>
+            </th>
+            <th class="sortable" :aria-sort="ariaSort('status')" @click="toggle('status')">
+              Status <span class="sort-ind">{{ indicator('status') }}</span>
+            </th>
             <th></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="m in modules" :key="m.id">
+          <tr v-for="m in sortedModules" :key="m.id">
             <td style="font-weight: 600">
               <RouterLink :to="`/admin/modules/${m.id}`" style="text-decoration: none">{{ m.title }}</RouterLink>
             </td>

@@ -8,6 +8,14 @@ export interface ReleaseNote {
 // Newest first. Add a new entry here whenever APP_VERSION is bumped in version.ts.
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'v3.1',
+    date: '2026-10-15',
+    title: 'Sortable tables',
+    changes: [
+      'Click any column heading to sort the Employees, admin Modules and employee My Modules tables; click again to reverse. Empty values always sort last.',
+    ],
+  },
+  {
     version: 'v3.0',
     date: '2026-10-15',
     title: 'Release notes page',

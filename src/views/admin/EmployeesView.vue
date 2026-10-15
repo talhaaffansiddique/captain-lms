@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { logActivity } from '@/lib/activity'
 import { parseEmployeeCsv, type ParsedEmployeeRow } from '@/lib/csv'
 import { loadDepartments } from '@/lib/departments'
+import { useSort } from '@/composables/useSort'
 import { manageEmployee, isActive, initialsOf } from '@/lib/employees'
 import type { Profile, Department } from '@/lib/database.types'
 
@@ -39,6 +40,13 @@ onMounted(async () => {
 })
 
 const visibleEmployees = computed(() => employees.value.filter((e) => showInactive.value || isActive(e)))
+const { sorted: sortedEmployees, toggle, indicator, ariaSort } = useSort(visibleEmployees, {
+  name: (e) => e.full_name,
+  department: (e) => e.department,
+  role: (e) => e.role,
+  deadline: (e) => e.due_date,
+  status: (e) => (isActive(e) ? 'Active' : 'Inactive'),
+})
 const inactiveCount = computed(() => employees.value.filter((e) => !isActive(e)).length)
 
 async function addEmployee() {
@@ -217,16 +225,26 @@ async function runImport() {
       <table>
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Department</th>
-            <th>Role</th>
-            <th>Deadline</th>
-            <th>Status</th>
+            <th class="sortable" :aria-sort="ariaSort('name')" @click="toggle('name')">
+              Name <span class="sort-ind">{{ indicator('name') }}</span>
+            </th>
+            <th class="sortable" :aria-sort="ariaSort('department')" @click="toggle('department')">
+              Department <span class="sort-ind">{{ indicator('department') }}</span>
+            </th>
+            <th class="sortable" :aria-sort="ariaSort('role')" @click="toggle('role')">
+              Role <span class="sort-ind">{{ indicator('role') }}</span>
+            </th>
+            <th class="sortable" :aria-sort="ariaSort('deadline')" @click="toggle('deadline')">
+              Deadline <span class="sort-ind">{{ indicator('deadline') }}</span>
+            </th>
+            <th class="sortable" :aria-sort="ariaSort('status')" @click="toggle('status')">
+              Status <span class="sort-ind">{{ indicator('status') }}</span>
+            </th>
             <th></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="e in visibleEmployees" :key="e.id" :style="{ opacity: isActive(e) ? 1 : 0.55 }">
+          <tr v-for="e in sortedEmployees" :key="e.id" :style="{ opacity: isActive(e) ? 1 : 0.55 }">
             <td style="font-weight: 600">
               <RouterLink :to="`/admin/employees/${e.id}`" style="display: flex; align-items: center; gap: 10px; text-decoration: none">
                 <div class="avatar" style="width: 26px; height: 26px; font-size: 11px">
