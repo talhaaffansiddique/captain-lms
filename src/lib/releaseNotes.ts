@@ -8,6 +8,16 @@ export interface ReleaseNote {
 // Newest first. Add a new entry here whenever APP_VERSION is bumped in version.ts.
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'v4.4',
+    date: '2026-11-06',
+    title: 'Certificates & badges info screen',
+    changes: [
+      'Certificates & badges now explains every badge: click one to see why it exists, how you earned it (or what is left to earn it) and your certificate.',
+      'Earned badges show your quiz score, the attempt that passed, the date earned, a certificate ID and a certificate preview with a link to the full certificate.',
+      'Locked badges show a checklist, lesson progress, your quiz attempts so far and a Take the quiz / Continue learning button.',
+    ],
+  },
+  {
     version: 'v4.3',
     date: '2026-10-15',
     title: 'Revamp phase 5: admin analytics and manager team views',
