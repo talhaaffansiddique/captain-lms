@@ -8,6 +8,24 @@ export interface ReleaseNote {
 // Newest first. Add a new entry here whenever APP_VERSION is bumped in version.ts.
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'v5.0',
+    date: '2026-11-18',
+    title: 'Certificates, assignments, KPI dashboards, HR portal and leaderboard',
+    changes: [
+      'Certificates: issue official certificates to one or many employees (optionally linked to a course, with credit hours and a citation), preview or download the PDF, and revoke them. Classic design or your own PDF template with a drag-and-place alignment tool.',
+      'Badges: set milestone rules from course hours, courses completed and certificates earned (match All or Any), create custom recognition badges and award or revoke them with a citation.',
+      'Course assignments: assign a course to many employees, including other departments, from Courses, the Course Editor and Employee Detail; set and change deadlines or remove assignments.',
+      'Audience colours: each audience has a colour (a new one is picked automatically) and its courses inherit it. The manual course colour picker is gone.',
+      'Bulk imports: CSV invitations now go through Resend, every row shows its result and a clear reason if it failed, and Retry failed invites re-sends only the failed rows.',
+      'KPI dashboards: completion trends, compliance distribution, quiz performance and active learners, with date-range and department filters.',
+      'Monitoring & alerts: email inactive learners and upcoming or missed deadlines, with HR and manager CC, manually or automatically every day.',
+      'Lessons: upload a video file (MP4, MOV, WEBM) straight from your computer instead of using YouTube.',
+      'New read-only HR portal (KPI overview and compliance alerts) and an organisation leaderboard on the admin, HR, manager and employee portals, ranked by badges, course completions and recent activity.',
+      'Employees: a richer Certificates & badges page (hours, courses, certificates, achievement progress, recognition, PDF downloads, badge tooltips) and assigned courses with Assigned and Due labels across Dashboard, Catalog and My learning.',
+      'One-time setup: run supabase/v5.sql in Supabase. To undo any part, see V5-REVERT-GUIDE.md.',
+    ],
+  },
+  {
     version: 'v4.5.1',
     date: '2026-11-18',
     title: 'Email looks right in dark mode',

@@ -8,7 +8,7 @@ export function mailConfigured(): boolean {
   return !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS && process.env.MAIL_FROM)
 }
 
-export async function sendMail(to: string, subject: string, html: string): Promise<void> {
+export async function sendMail(to: string, subject: string, html: string, cc?: string[]): Promise<void> {
   const port = Number(process.env.SMTP_PORT ?? 465)
   const transport = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
@@ -18,5 +18,5 @@ export async function sendMail(to: string, subject: string, html: string): Promi
     connectionTimeout: 10000,
     socketTimeout: 15000,
   })
-  await transport.sendMail({ from: process.env.MAIL_FROM, to, subject, html })
+  await transport.sendMail({ from: process.env.MAIL_FROM, to, ...(cc?.length ? { cc } : {}), subject, html })
 }

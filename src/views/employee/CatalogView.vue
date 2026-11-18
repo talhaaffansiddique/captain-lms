@@ -4,7 +4,8 @@ import { useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
 import { loadCourses, courseProgress, courseCode, formatCourseTime, type CourseVM } from '@/lib/courses'
-import type { Module, VideoCompletion } from '@/lib/database.types'
+import { loadMyModules, dueLabel, daysUntil, type Assignment } from '@/lib/assignments'
+import type { VideoCompletion } from '@/lib/database.types'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -13,17 +14,17 @@ const completions = ref<VideoCompletion[]>([])
 const loading = ref(true)
 const search = ref('')
 const category = ref('All')
+const assignedOnly = ref(false)
+const assignments = ref<Assignment[]>([])
 
 onMounted(async () => {
   const dept = auth.profile?.department
   const userId = auth.profile?.id
   if (!dept || !userId) return
-  const [{ data: mods }, { data: comps }] = await Promise.all([
-    supabase.from('modules').select('*').or(`department.eq.General,department.eq.${dept}`).order('id'),
-    supabase.from('video_completions').select('*').eq('user_id', userId),
-  ])
+  const [mine, { data: comps }] = await Promise.all([loadMyModules(userId, dept), supabase.from('video_completions').select('*').eq('user_id', userId)])
   completions.value = (comps ?? []) as VideoCompletion[]
-  courses.value = (await loadCourses((mods ?? []) as Module[])).filter((c) => c.lessons.length > 0)
+  assignments.value = mine.assignments
+  courses.value = (await loadCourses(mine.modules)).filter((c) => c.lessons.length > 0)
   loading.value = false
 })
 
@@ -32,9 +33,17 @@ const categories = computed(() => ['All', ...new Set(courses.value.map((c) => c.
 const shown = computed(() => {
   const q = search.value.trim().toLowerCase()
   return courses.value.filter(
-    (c) => (category.value === 'All' || c.category === category.value) && (!q || `${c.title} ${c.category}`.toLowerCase().includes(q)),
+    (c) =>
+      (category.value === 'All' || c.category === category.value) &&
+      (!assignedOnly.value || !!assignmentFor(c)) &&
+      (!q || `${c.title} ${c.category}`.toLowerCase().includes(q)),
   )
 })
+
+function assignmentFor(c: CourseVM): Assignment | undefined {
+  return c.dbId ? assignments.value.find((a) => a.course_id === c.dbId) : undefined
+}
+const assignedCount = computed(() => courses.value.filter((c) => !!assignmentFor(c)).length)
 
 function open(c: CourseVM) {
   const p = courseProgress(c, completions.value)
@@ -59,6 +68,7 @@ function statusText(pct: number, status: string) {
     <div class="row wrap" style="margin-bottom: 14px">
       <input v-model="search" type="text" placeholder="Search by course name… try “ERP”" style="flex: 1; min-width: 220px" />
       <div class="row wrap" style="gap: 8px">
+        <button class="chip-btn" :class="{ on: assignedOnly }" @click="assignedOnly = !assignedOnly">★ Assigned to me ({{ assignedCount }})</button>
         <button v-for="c in categories" :key="c" class="chip-btn" :class="{ on: category === c }" @click="category = c">{{ c }}</button>
       </div>
     </div>
@@ -69,6 +79,7 @@ function statusText(pct: number, status: string) {
       <button v-for="c in shown" :key="c.id" class="card course-card" @click="open(c)">
         <div class="cover" :style="{ background: c.color }">
           <span class="cat">{{ c.category }}</span>
+          <span v-if="assignmentFor(c)" class="asg-tag">Assigned</span>
           <b>{{ courseCode(c.title) }}</b>
         </div>
         <div class="body">
@@ -78,6 +89,7 @@ function statusText(pct: number, status: string) {
             <span>📄 {{ courseProgress(c, completions).docs }} docs</span>
             <span>{{ formatCourseTime(courseProgress(c, completions).minutes) }}</span>
           </div>
+          <div v-if="assignmentFor(c)" class="due-tag" :class="{ late: (daysUntil(assignmentFor(c)!.due_date) ?? 1) < 0 }">{{ dueLabel(assignmentFor(c)!.due_date) }}</div>
           <div class="row">
             <div class="bar"><i :style="{ width: courseProgress(c, completions).pct + '%', background: c.color }" /></div>
             <b style="font-size: 12.5px; white-space: nowrap">{{ statusText(courseProgress(c, completions).pct, courseProgress(c, completions).status) }}</b>
@@ -92,6 +104,31 @@ function statusText(pct: number, status: string) {
 </template>
 
 <style scoped>
+.asg-tag {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: #fff;
+  color: #0f1a2e;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 99px;
+}
+.due-tag {
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 700;
+  background: var(--brass-soft);
+  color: var(--brass-strong);
+  padding: 3px 10px;
+  border-radius: 99px;
+  margin-bottom: 8px;
+}
+.due-tag.late {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
 .course-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));

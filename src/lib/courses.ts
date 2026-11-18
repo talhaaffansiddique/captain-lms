@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { loadAudienceColors } from '@/lib/departments'
 import type { Course, Module, VideoCompletion } from '@/lib/database.types'
 
 export const COURSE_COLORS = ['#2f5be8', '#0f7f6c', '#6d3fc0', '#b4530f', '#a3306b', '#1d8348', '#1f4e8c', '#0f1b33']
@@ -30,8 +31,11 @@ export function sortedLessons(lessons: Module[]): Module[] {
  * falls back to one virtual course per audience so the catalog still works.
  */
 export async function loadCourses(modules: Module[], options: { includeUnpublished?: boolean } = {}): Promise<CourseVM[]> {
+  // A course's colour is its audience's colour (Admin → Audiences), not a per-course setting.
+  const audienceColors = await loadAudienceColors()
+  const withAudienceColor = (list: CourseVM[]) => list.map((c) => ({ ...c, color: audienceColors[c.category] ?? c.color }))
   const { data, error } = await supabase.from('courses').select('*').order('id')
-  if (error || !data) return virtualCourses(modules)
+  if (error || !data) return withAudienceColor(virtualCourses(modules))
 
   const courses = (data as Course[]).filter((c) => options.includeUnpublished || c.is_published)
   const byCourse = new Map<number, Module[]>()
@@ -54,7 +58,7 @@ export async function loadCourses(modules: Module[], options: { includeUnpublish
   if (unassigned.length) {
     for (const v of virtualCourses(unassigned)) result.push({ ...v, title: `${v.title} (not in a course yet)` })
   }
-  return result
+  return withAudienceColor(result)
 }
 
 function virtualCourses(modules: Module[]): CourseVM[] {

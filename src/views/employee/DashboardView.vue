@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { loadTrackData, pendingMilestones, milestoneLabel, type Milestone } from '@/lib/quiz'
 import { loadCourses, courseProgress, courseCode, type CourseVM } from '@/lib/courses'
 import { loadStudyLog, streakFromDays, isoDay, relativeTime } from '@/lib/learning'
+import { loadMyAssignments, dueLabel, daysUntil, type Assignment } from '@/lib/assignments'
 import DashWidget from '@/components/DashWidget.vue'
 import PracticeQuiz from '@/components/PracticeQuiz.vue'
 import type { Module, VideoCompletion, QuizAttempt, Announcement } from '@/lib/database.types'
@@ -21,6 +22,7 @@ const announcement = ref<Announcement | null>(null)
 const dismissedAnnouncementIds = ref<number[]>(JSON.parse(localStorage.getItem('dismissedAnnouncements') ?? '[]'))
 const tab = ref<'In progress' | 'Completed'>('In progress')
 const quizCourse = ref<CourseVM | null>(null)
+const assignments = ref<Assignment[]>([])
 
 onMounted(async () => {
   const dept = auth.profile?.department
@@ -35,7 +37,16 @@ onMounted(async () => {
   track.value = t
   completions.value = comp
   attempts.value = att
-  courses.value = (await loadCourses(t)).filter((c) => c.lessons.length > 0)
+  assignments.value = await loadMyAssignments(userId)
+  // Lessons of assigned courses (any department) join the course list alongside the usual track.
+  let extra: Module[] = []
+  const ids = [...new Set(assignments.value.map((a) => a.course_id))]
+  if (ids.length) {
+    const { data: em } = await supabase.from('modules').select('*').in('course_id', ids)
+    const have = new Set(t.map((m) => m.id))
+    extra = ((em ?? []) as Module[]).filter((m) => !have.has(m.id))
+  }
+  courses.value = (await loadCourses([...t, ...extra])).filter((c) => c.lessons.length > 0)
   nextQuiz.value = pendingMilestones(t, comp, att, grants)[0] ?? null
   announcement.value = latestAnnouncement
 
@@ -64,6 +75,16 @@ const isOverdue = computed(() => {
   const allDone = track.value.length > 0 && track.value.every((m) => doneIds.value.has(m.id))
   return !allDone && due < isoDay(new Date())
 })
+
+function assignmentFor(c: CourseVM): Assignment | undefined {
+  return c.dbId ? assignments.value.find((a) => a.course_id === c.dbId) : undefined
+}
+const assignedToMe = computed(() =>
+  courses.value
+    .map((c) => ({ course: c, a: assignmentFor(c), p: courseProgress(c, completions.value) }))
+    .filter((x) => x.a && x.p.status !== 'completed')
+    .sort((x, y) => (daysUntil(x.a!.due_date) ?? 9999) - (daysUntil(y.a!.due_date) ?? 9999)),
+)
 
 const withProgress = computed(() => courses.value.map((c) => ({ course: c, p: courseProgress(c, completions.value) })))
 const inProgress = computed(() => withProgress.value.filter((x) => x.p.status === 'in-progress'))
@@ -227,6 +248,17 @@ const greeting = (() => {
 
       <div class="cols">
         <div>
+          <div v-if="assignedToMe.length" class="card" style="padding: 20px; margin-bottom: 16px">
+            <div class="row" style="margin-bottom: 8px"><h2 style="font-size: 20px">Assigned to you</h2><span class="pill pill-teal sp" style="max-width: max-content">{{ assignedToMe.length }}</span></div>
+            <RouterLink v-for="x in assignedToMe" :key="x.course.id" :to="`/app/modules/${(x.p.nextLesson ?? x.course.lessons[0])?.id}`" class="course-row">
+              <span class="tile" :style="{ background: x.course.color }">{{ courseCode(x.course.title) }}</span>
+              <span class="grow">
+                <span class="row"><b>{{ x.course.title }}</b></span>
+                <span class="sub" style="display: block; margin-top: 3px">{{ x.course.category }} · {{ x.p.pct }}% done</span>
+              </span>
+              <span class="pill" :class="(daysUntil(x.a!.due_date) ?? 1) < 0 ? 'pill-danger' : 'pill-brass'">{{ dueLabel(x.a!.due_date) }}</span>
+            </RouterLink>
+          </div>
           <DashWidget id="emp.courses">
             <div class="card" style="padding: 20px">
               <div class="row" style="margin-bottom: 8px">
@@ -243,7 +275,7 @@ const greeting = (() => {
               >
                 <span class="tile" :style="{ background: x.course.color }">{{ courseCode(x.course.title) }}</span>
                 <span class="grow">
-                  <span class="row"><b>{{ x.course.title }}</b><b class="sp">{{ x.p.pct }}%</b></span>
+                  <span class="row"><b>{{ x.course.title }}</b><span v-if="assignmentFor(x.course)" class="pill pill-teal">Assigned</span><b class="sp">{{ x.p.pct }}%</b></span>
                   <span class="row" style="margin-top: 4px"><span class="bar"><i :style="{ width: x.p.pct + '%', background: x.course.color }" /></span></span>
                   <span class="sub" style="display: block; margin-top: 3px">{{ x.course.category }} · Lesson {{ Math.min(x.p.done + 1, x.p.total) }} of {{ x.p.total }}</span>
                 </span>

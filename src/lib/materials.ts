@@ -1,7 +1,13 @@
 import { supabase } from './supabase'
 
 const BUCKET = 'module-materials'
-const ALLOWED_EXTENSIONS = ['pdf', 'pptx', 'ppt', 'docx', 'doc']
+export const VIDEO_FILE_TYPES = ['mp4', 'mov', 'webm', 'm4v']
+const ALLOWED_EXTENSIONS = ['pdf', 'pptx', 'ppt', 'docx', 'doc', ...VIDEO_FILE_TYPES]
+
+/** True for an uploaded video file (as opposed to a YouTube video or a document). */
+export function isVideoFile(type: string | null | undefined): boolean {
+  return !!type && VIDEO_FILE_TYPES.includes(type.toLowerCase())
+}
 const MAX_SIZE_BYTES = 50 * 1024 * 1024 // 50MB — Supabase Storage's free-tier default object limit
 
 export function inferDocumentType(filename: string): string | null {
@@ -17,7 +23,7 @@ export interface UploadResult {
 
 export async function uploadModuleMaterial(moduleId: number, file: File): Promise<UploadResult> {
   const type = inferDocumentType(file.name)
-  if (!type) return { url: null, type: null, error: 'Only PDF, PPTX, or DOCX files are supported.' }
+  if (!type) return { url: null, type: null, error: 'Only PDF, PPTX, DOCX or video (MP4, MOV, WEBM) files are supported.' }
   if (file.size > MAX_SIZE_BYTES) return { url: null, type: null, error: 'File is too large (50MB max).' }
 
   const path = `${moduleId}/${Date.now()}-${file.name}`
@@ -46,6 +52,7 @@ interface MaterialModule {
  * like "PDF", or "None" if nothing's attached yet. */
 export function materialType(m: MaterialModule): string {
   if (m.youtube_id) return 'Video'
+  if (m.document_type && VIDEO_FILE_TYPES.includes(m.document_type)) return 'Video file'
   if (m.document_type) return m.document_type.toUpperCase()
   return 'None'
 }
@@ -53,7 +60,7 @@ export function materialType(m: MaterialModule): string {
 /** Minutes for a video (the real length once someone's played it at least once — a fresh video
  * shows a 5-minute placeholder until then), "Untimed" for a document, or "—" for neither. */
 export function formatDuration(m: MaterialModule & { duration_seconds: number }): string {
-  if (!m.youtube_id) return m.document_type ? 'Untimed' : '—'
+  if (!m.youtube_id) return m.document_type ? (VIDEO_FILE_TYPES.includes(m.document_type) ? 'Video' : 'Untimed') : '—'
   const mins = Math.round(m.duration_seconds / 60)
   return mins < 1 ? '<1 min' : `${mins} min`
 }

@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import { logActivity } from '@/lib/activity'
 import { loadDepartments } from '@/lib/departments'
 import { manageEmployee, isActive } from '@/lib/employees'
+import EmployeeAssignedCourses from '@/components/EmployeeAssignedCourses.vue'
 import { allMilestonesForTrack, milestoneLabel, attemptsFor, maxAttemptsFor, hasPassed, loadTrackData } from '@/lib/quiz'
 import type { Profile, QuizAttempt, QuizAttemptGrant, Department, Module } from '@/lib/database.types'
 
@@ -233,6 +234,7 @@ async function grantExtra(milestone: string) {
         <select v-model="editRole">
           <option value="employee">Employee</option>
           <option value="manager">Manager</option>
+          <option value="hr">HR (read-only)</option>
           <option value="admin">Admin</option>
         </select>
       </div>
@@ -294,6 +296,8 @@ async function grantExtra(milestone: string) {
         {{ escalating ? 'Sending…' : 'Send escalation notice' }}
       </button>
     </div>
+
+    <EmployeeAssignedCourses :user-id="employee.id" :name="employee.full_name" />
 
     <div class="card">
       <div class="panel-title"><h3>Quiz attempts</h3></div>

@@ -15,10 +15,13 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",
+    "chart.js": "^4.6.1",
     "jszip": "^3.10.2",
     "nodemailer": "^10.6.0",
+    "pdf-lib": "^1.17.1",
     "pinia": "^4.0.2",
     "vue": "^3.5.40",
+    "vue-chartjs": "^5.3.4",
     "vue-router": "^5.2.0"
   },
   "devDependencies": {

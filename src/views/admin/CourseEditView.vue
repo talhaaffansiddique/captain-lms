@@ -4,10 +4,13 @@ import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
 import { logActivity } from '@/lib/activity'
-import { loadDepartments } from '@/lib/departments'
-import { COURSE_COLORS, sortedLessons } from '@/lib/courses'
+import { loadDepartments, loadAudienceColors } from '@/lib/departments'
+import { sortedLessons } from '@/lib/courses'
+import { loadAssignments, setAssignmentDue, removeAssignment, daysUntil, type Assignment } from '@/lib/assignments'
+import { isActive } from '@/lib/employees'
+import AssignCourseModal from '@/components/AssignCourseModal.vue'
 import { materialType, formatDuration } from '@/lib/materials'
-import type { Course, Module } from '@/lib/database.types'
+import type { Course, Module, Profile, VideoCompletion } from '@/lib/database.types'
 
 const route = useRoute()
 const router = useRouter()
@@ -23,7 +26,12 @@ const loading = ref(true)
 const title = ref('')
 const category = ref('General')
 const description = ref('')
-const color = ref(COURSE_COLORS[0]!)
+const audienceColors = ref<Record<string, string>>({})
+const assigned = ref<Assignment[]>([])
+const people = ref<Profile[]>([])
+const doneByUser = ref<Record<string, number>>({})
+const assignMissing = ref(false)
+const showAssign = ref(false)
 const published = ref(true)
 const saving = ref(false)
 const saved = ref(false)
@@ -44,10 +52,51 @@ async function load() {
     title.value = course.value.title
     category.value = course.value.category
     description.value = course.value.description ?? ''
-    color.value = course.value.color
     published.value = course.value.is_published
   }
+  audienceColors.value = await loadAudienceColors()
+  await loadAssigned()
   loading.value = false
+}
+
+async function loadAssigned() {
+  const [asg, { data: profs }] = await Promise.all([loadAssignments({ courseId }), supabase.from('profiles').select('*')])
+  assignMissing.value = asg.missing
+  assigned.value = asg.rows
+  people.value = ((profs ?? []) as Profile[]).filter(isActive)
+  const lessonIds = lessons.value.map((l) => l.id)
+  const done: Record<string, number> = {}
+  if (asg.rows.length && lessonIds.length) {
+    const { data: comps } = await supabase
+      .from('video_completions')
+      .select('user_id, module_id, completed')
+      .in('module_id', lessonIds)
+      .eq('completed', true)
+      .in('user_id', asg.rows.map((r) => r.user_id))
+    for (const c of (comps ?? []) as Pick<VideoCompletion, 'user_id'>[]) done[c.user_id] = (done[c.user_id] ?? 0) + 1
+  }
+  doneByUser.value = done
+}
+
+const personById = computed(() => new Map(people.value.map((p) => [p.id, p])))
+function statusOf(a: Assignment): { text: string; cls: string } {
+  const total = lessons.value.length
+  const d = doneByUser.value[a.user_id] ?? 0
+  if (total && d >= total) return { text: 'Completed', cls: 'pill-teal' }
+  const left = daysUntil(a.due_date)
+  if (left !== null && left < 0) return { text: 'Overdue', cls: 'pill-danger' }
+  return d > 0 ? { text: `In progress · ${d}/${total}`, cls: 'pill-outline' } : { text: 'Not started', cls: 'pill-muted' }
+}
+async function changeDue(a: Assignment, value: string) {
+  await setAssignmentDue(a.id, value || null)
+  await loadAssigned()
+}
+async function unassign(a: Assignment) {
+  const who = personById.value.get(a.user_id)?.full_name ?? 'this employee'
+  if (!window.confirm(`Remove ${who} from this course?\n\nTheir progress is kept; the course just stops being assigned to them.`)) return
+  await removeAssignment(a.id)
+  await logActivity(auth.profile?.id, `Unassigned "${course.value?.title}" from ${who}`)
+  await loadAssigned()
 }
 
 onMounted(load)
@@ -58,7 +107,7 @@ async function saveDetails() {
   saved.value = false
   await supabase
     .from('courses')
-    .update({ title: title.value.trim(), category: category.value, description: description.value.trim() || null, color: color.value, is_published: published.value })
+    .update({ title: title.value.trim(), category: category.value, description: description.value.trim() || null, is_published: published.value })
     .eq('id', courseId)
   await logActivity(auth.profile?.id, `Updated course "${title.value.trim()}"`)
   saving.value = false
@@ -126,12 +175,10 @@ async function deleteCourse() {
           </select>
         </div>
         <div class="field"><label>Description (optional)</label><textarea v-model="description" rows="3" /></div>
-        <div class="field">
-          <label>Colour</label>
-          <div class="row wrap" style="gap: 8px">
-            <button v-for="c in COURSE_COLORS" :key="c" class="swatch" :class="{ on: color === c }" :style="{ background: c }" :aria-label="c" @click="color = c" />
-          </div>
-        </div>
+        <p class="hint" style="margin: 0 0 10px">
+          <span class="dot" :style="{ background: audienceColors[category] ?? '#888' }" />
+          Colour is inherited from the <b>{{ category }}</b> audience — change it in <RouterLink to="/admin/audiences">Audiences</RouterLink>.
+        </p>
         <label class="row" style="gap: 8px; font-weight: 400"><input v-model="published" type="checkbox" style="width: auto" /> Published (visible in the catalog)</label>
         <div class="row" style="margin-top: 12px">
           <button class="btn btn-primary btn-sm" :disabled="saving" @click="saveDetails">{{ saving ? 'Saving…' : 'Save details' }}</button>
@@ -162,11 +209,45 @@ async function deleteCourse() {
         </div>
       </div>
     </div>
+
+    <div class="card" style="padding: 18px; margin-top: 18px">
+      <div class="panel-title" style="padding: 0 0 8px">
+        <h3>Assigned employees</h3>
+        <button class="btn btn-primary btn-sm" :disabled="assignMissing" @click="showAssign = true">+ Assign employees</button>
+      </div>
+      <p v-if="assignMissing" class="hint" style="color: var(--danger)">Run <code>supabase/v5.sql</code> in Supabase to turn on course assignments.</p>
+      <div v-else class="table-wrap">
+        <table>
+          <thead><tr><th>Employee</th><th>Department</th><th>Deadline</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            <tr v-for="a in assigned" :key="a.id">
+              <td><b>{{ personById.get(a.user_id)?.full_name ?? 'Unknown' }}</b></td>
+              <td>
+                {{ personById.get(a.user_id)?.department }}
+                <span v-if="personById.get(a.user_id)?.department !== course.category && course.category !== 'General'" class="pill pill-brass" style="margin-left: 4px">other department</span>
+              </td>
+              <td><input type="date" style="width: 160px" :value="a.due_date ?? ''" @change="changeDue(a, ($event.target as HTMLInputElement).value)" /></td>
+              <td><span :class="['pill', statusOf(a).cls]">{{ statusOf(a).text }}</span></td>
+              <td style="text-align: right"><button class="btn btn-ghost btn-sm" style="color: var(--danger)" @click="unassign(a)">Remove</button></td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-if="!assigned.length" class="hint" style="padding: 16px; text-align: center">Nobody is assigned yet.</p>
+      </div>
+    </div>
+    <AssignCourseModal v-if="showAssign" :course-id="courseId" :course-title="course.title" @close="showAssign = false" @done="loadAssigned" />
   </div>
   <div v-else class="hint">Course not found.</div>
 </template>
 
 <style scoped>
+.dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  vertical-align: -1px;
+}
 .cols {
   display: grid;
   grid-template-columns: 1fr 1.3fr;

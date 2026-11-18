@@ -4,8 +4,10 @@ import { useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
 import { logActivity } from '@/lib/activity'
-import { loadDepartments } from '@/lib/departments'
-import { COURSE_COLORS, courseCode } from '@/lib/courses'
+import { loadDepartments, loadAudienceColors } from '@/lib/departments'
+import { courseCode } from '@/lib/courses'
+import { loadAssignments } from '@/lib/assignments'
+import AssignCourseModal from '@/components/AssignCourseModal.vue'
 import { useSort } from '@/composables/useSort'
 import type { Course, Module } from '@/lib/database.types'
 
@@ -18,17 +20,25 @@ const loading = ref(true)
 
 const title = ref('')
 const category = ref('General')
-const color = ref(COURSE_COLORS[0]!)
+const audienceColors = ref<Record<string, string>>({})
+const assignedCounts = ref<Record<number, number>>({})
+const assigning = ref<Course | null>(null)
 const categories = ref<string[]>(['General'])
 const saving = ref(false)
 const error = ref('')
 
 async function load() {
-  const [{ data, error: err }, { data: mods }, depts] = await Promise.all([
+  const [{ data, error: err }, { data: mods }, depts, colors, asg] = await Promise.all([
     supabase.from('courses').select('*').order('id', { ascending: false }),
     supabase.from('modules').select('id, course_id'),
     loadDepartments(),
+    loadAudienceColors(),
+    loadAssignments(),
   ])
+  audienceColors.value = colors
+  const ac: Record<number, number> = {}
+  for (const a of asg.rows) ac[a.course_id] = (ac[a.course_id] ?? 0) + 1
+  assignedCounts.value = ac
   categories.value = ['General', ...depts.map((d) => d.name)]
   if (err) {
     missingTable.value = true
@@ -57,7 +67,7 @@ async function createCourse() {
   error.value = ''
   const { data, error: err } = await supabase
     .from('courses')
-    .insert({ title: title.value.trim(), category: category.value, color: color.value })
+    .insert({ title: title.value.trim(), category: category.value })
     .select()
     .single()
   saving.value = false
@@ -112,20 +122,7 @@ async function deleteCourse(c: Course) {
             <option v-for="c in categories" :key="c" :value="c">{{ c }}</option>
           </select>
         </div>
-        <div class="field">
-          <label>Colour</label>
-          <div class="row wrap" style="gap: 8px">
-            <button
-              v-for="c in COURSE_COLORS"
-              :key="c"
-              class="swatch"
-              :class="{ on: color === c }"
-              :style="{ background: c }"
-              :aria-label="c"
-              @click="color = c"
-            />
-          </div>
-        </div>
+        <p class="hint" style="margin: 0 0 10px"><span class="dot" :style="{ background: audienceColors[category] ?? '#888' }" /> The course colour follows its category's audience colour (Admin → Audiences).</p>
         <button class="btn btn-primary btn-sm" :disabled="saving || !title.trim()" @click="createCourse">{{ saving ? 'Creating…' : 'Create course' }}</button>
         <p v-if="error" class="hint" style="color: var(--danger)">{{ error }}</p>
       </div>
@@ -137,6 +134,7 @@ async function deleteCourse(c: Course) {
               <th class="sortable" :aria-sort="ariaSort('title')" @click="toggle('title')">Course <span class="sort-ind">{{ indicator('title') }}</span></th>
               <th class="sortable" :aria-sort="ariaSort('category')" @click="toggle('category')">Category <span class="sort-ind">{{ indicator('category') }}</span></th>
               <th class="sortable" :aria-sort="ariaSort('lessons')" @click="toggle('lessons')">Lessons <span class="sort-ind">{{ indicator('lessons') }}</span></th>
+              <th>Assigned</th>
               <th class="sortable" :aria-sort="ariaSort('status')" @click="toggle('status')">Status <span class="sort-ind">{{ indicator('status') }}</span></th>
               <th></th>
             </tr>
@@ -145,15 +143,17 @@ async function deleteCourse(c: Course) {
             <tr v-for="c in sortedCourses" :key="c.id">
               <td>
                 <RouterLink :to="`/admin/courses/${c.id}`" class="row" style="text-decoration: none; font-weight: 700">
-                  <span class="tile" :style="{ background: c.color, width: '36px', height: '36px', fontSize: '12px', borderRadius: '10px' }">{{ courseCode(c.title) }}</span>
+                  <span class="tile" :style="{ background: audienceColors[c.category] ?? c.color, width: '36px', height: '36px', fontSize: '12px', borderRadius: '10px' }">{{ courseCode(c.title) }}</span>
                   {{ c.title }}
                 </RouterLink>
               </td>
               <td><span class="pill pill-outline">{{ c.category }}</span></td>
               <td>{{ lessonCounts[c.id] ?? 0 }}</td>
+              <td><span class="pill pill-outline">{{ assignedCounts[c.id] ?? 0 }} employees</span></td>
               <td><span :class="['pill', c.is_published ? 'pill-teal' : 'pill-muted']">{{ c.is_published ? 'Published' : 'Hidden' }}</span></td>
               <td style="white-space: nowrap">
                 <RouterLink class="btn btn-ghost btn-sm" :to="`/admin/courses/${c.id}`">Open</RouterLink>
+                <button class="btn btn-primary btn-sm" style="margin-left: 4px" @click="assigning = c">Assign</button>
                 <button class="btn btn-ghost btn-sm" style="margin-left: 4px" @click="togglePublish(c)">{{ c.is_published ? 'Hide' : 'Publish' }}</button>
                 <button class="btn btn-ghost btn-sm" style="margin-left: 4px; color: var(--danger)" @click="deleteCourse(c)">Delete</button>
               </td>
@@ -163,10 +163,18 @@ async function deleteCourse(c: Course) {
         <p v-if="!loading && !courses.length" style="padding: 24px; text-align: center; color: var(--ink-soft)">No courses yet — create the first one above.</p>
       </div>
     </template>
+    <AssignCourseModal v-if="assigning" :course-id="assigning.id" :course-title="assigning.title" @close="assigning = null" @done="load" />
   </div>
 </template>
 
 <style scoped>
+.dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  vertical-align: -1px;
+}
 .swatch {
   width: 30px;
   height: 30px;
