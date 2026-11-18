@@ -15,6 +15,24 @@ import {
   BASE_MAX_ATTEMPTS,
   type TrackData,
 } from '@/lib/quiz'
+import { supabase } from '@/lib/supabase'
+import {
+  loadMyMetrics,
+  loadRules,
+  loadRecognitionBadges,
+  loadAwards,
+  loadCertificates,
+  loadCertificateSettings,
+  evaluateRule,
+  certificateFields,
+  type Metrics,
+  type MilestoneRule,
+  type RecognitionBadge,
+  type BadgeAward,
+  type IssuedCertificate,
+} from '@/lib/achievements'
+import { buildCertificatePdf, pdfBlobUrl, downloadBlobUrl, type CertificateSettings } from '@/lib/certificatePdf'
+import CertificatePreview from '@/components/CertificatePreview.vue'
 
 interface Tier {
   m: string
@@ -37,8 +55,72 @@ const data = ref<TrackData | null>(null)
 const loading = ref(true)
 const selected = ref('1')
 
+// ---- v5: achievements hub ----
+const metrics = ref<Metrics>({ hours: 0, courses: 0, certs: 0 })
+const rules = ref<MilestoneRule[]>([])
+const recog = ref<RecognitionBadge[]>([])
+const awards = ref<BadgeAward[]>([])
+const certs = ref<IssuedCertificate[]>([])
+const courseTitles = ref<Record<number, string>>({})
+const certSettings = ref<CertificateSettings | null>(null)
+const hubFilter = ref<'all' | 'unlocked' | 'progress'>('all')
+const preview = ref<{ url: string; filename: string; title: string } | null>(null)
+const pdfError = ref('')
+
+async function loadHub() {
+  if (!auth.profile) return
+  const uid = auth.profile.id
+  const [m, r, rb, a, c, s, { data: cs }] = await Promise.all([
+    loadMyMetrics(uid, auth.profile.department),
+    loadRules(),
+    loadRecognitionBadges(),
+    loadAwards(uid),
+    loadCertificates(uid),
+    loadCertificateSettings(),
+    supabase.from('courses').select('id, title'),
+  ])
+  metrics.value = m
+  rules.value = r.rows.filter((x) => x.is_active)
+  recog.value = rb
+  awards.value = a
+  certs.value = c.rows.filter((x) => !x.revoked_at)
+  certSettings.value = s
+  courseTitles.value = Object.fromEntries(((cs ?? []) as { id: number; title: string }[]).map((x) => [x.id, x.title]))
+}
+
+const ruleCards = computed(() => rules.value.map((r) => ({ rule: r, st: evaluateRule(r, metrics.value) })))
+const shownRules = computed(() => ruleCards.value.filter((x) => hubFilter.value === 'all' || (hubFilter.value === 'unlocked' ? x.st.unlocked : !x.st.unlocked)))
+const recogById = computed(() => new Map(recog.value.map((b) => [b.id, b])))
+
+function certFields(c: IssuedCertificate) {
+  return certificateFields(c, auth.profile?.full_name ?? 'Employee', c.course_id ? (courseTitles.value[c.course_id] ?? null) : null)
+}
+async function previewCert(c: IssuedCertificate) {
+  pdfError.value = ''
+  try {
+    const bytes = await buildCertificatePdf(certSettings.value!, certFields(c))
+    preview.value = { url: pdfBlobUrl(bytes), filename: `${c.number}.pdf`, title: c.number }
+  } catch (e) {
+    pdfError.value = e instanceof Error ? e.message : 'Could not build the PDF.'
+  }
+}
+async function downloadCert(c: IssuedCertificate) {
+  pdfError.value = ''
+  try {
+    const url = pdfBlobUrl(await buildCertificatePdf(certSettings.value!, certFields(c)))
+    downloadBlobUrl(url, `${c.number}.pdf`)
+    setTimeout(() => URL.revokeObjectURL(url), 4000)
+  } catch (e) {
+    pdfError.value = e instanceof Error ? e.message : 'Could not build the PDF.'
+  }
+}
+function fmtShort(iso: string) {
+  return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
 onMounted(async () => {
   if (!auth.profile) return
+  void loadHub()
   data.value = await loadTrackData(auth.profile.id, auth.profile.department)
   const earned = TIERS.find((t) => hasPassed(t.m, data.value!.attempts))
   const next = TIERS.find((t) => !hasPassed(t.m, data.value!.attempts))
@@ -82,6 +164,30 @@ const current = computed(() => {
 const earnedCount = computed(() => (data.value ? TIERS.filter((t) => hasPassed(t.m, data.value!.attempts)).length : 0))
 
 const passPct = Math.round(PASS_THRESHOLD * 100)
+
+/** Hover / keyboard-focus tooltip for a milestone quiz badge. */
+function tip(t: Tier): { title: string; lines: string[] } {
+  const i = info(t)
+  if (!i) return { title: t.name, lines: [] }
+  if (i.earned && i.passedAttempt) {
+    const a = i.passedAttempt
+    return {
+      title: `${t.name} — unlocked`,
+      lines: [
+        `Unlocked on ${new Date(a.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}`,
+        `Passing score: ${passPct}%`,
+        `Your score: ${a.total ? Math.round((a.score / a.total) * 100) : 0}% (${a.score}/${a.total})`,
+        `Passed on attempt ${a.attempt_number} of ${i.max}`,
+      ],
+    }
+  }
+  const steps: string[] = []
+  steps.push(i.lessonsDone ? '✓ Finish the lessons in this block' : `1. Finish the lessons in this block (${i.done}/${i.total} done)`)
+  steps.push(`2. Pass the milestone quiz with ${passPct}% or more`)
+  steps.push(`You get ${i.max} attempts`)
+  if (i.locked) steps.push('All attempts used — ask your admin for another')
+  return { title: `${t.name} — locked`, lines: steps }
+}
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
 }
@@ -105,6 +211,66 @@ const lessonScope = computed(() => (current.value.tier.m === 'final' ? 'every le
 
     <p v-if="loading" class="sub">Loading…</p>
     <template v-else>
+      <div class="grid3">
+        <div class="card stat"><div class="lbl">⏱ Course hours completed</div><div class="val">{{ metrics.hours }}h</div></div>
+        <div class="card stat"><div class="lbl">📘 Courses completed</div><div class="val">{{ metrics.courses }}</div></div>
+        <div class="card stat"><div class="lbl">🎓 Certificates earned</div><div class="val">{{ metrics.certs }}</div></div>
+      </div>
+
+      <div class="card" style="padding: 18px; margin-bottom: 16px">
+        <div class="row wrap" style="margin-bottom: 10px">
+          <div class="kicker" style="margin: 0">Achievement badges</div>
+          <div class="row wrap" style="margin-left: auto; gap: 6px">
+            <button v-for="f in ([['all', 'All'], ['unlocked', 'Unlocked'], ['progress', 'In progress']] as const)" :key="f[0]" class="chip-btn" :class="{ on: hubFilter === f[0] }" @click="hubFilter = f[0]">{{ f[1] }}</button>
+          </div>
+        </div>
+        <div class="ach-grid">
+          <div v-for="x in shownRules" :key="x.rule.id" class="ach" :class="{ off: !x.st.unlocked }">
+            <div class="row" style="align-items: flex-start">
+              <span class="ach-ic">{{ x.rule.icon }}</span>
+              <div style="flex: 1"><b>{{ x.rule.name }}</b><div class="sub">{{ x.rule.match_mode === 'all' ? 'Meet ALL criteria' : 'Meet ANY criterion' }}</div></div>
+              <span class="pill" :class="x.st.unlocked ? 'pill-teal' : 'pill-outline'">{{ x.st.unlocked ? 'Unlocked' : 'In progress' }}</span>
+            </div>
+            <div v-for="c in x.st.criteria" :key="c.key" style="margin-top: 9px">
+              <div class="row" style="justify-content: space-between; font-size: 12.5px"><span>{{ c.label }}</span><b>{{ Math.min(c.have, c.need) }} / {{ c.need }}</b></div>
+              <div class="bar"><i :style="{ width: Math.min(100, c.need ? (c.have / c.need) * 100 : 100) + '%', background: c.ok ? 'var(--teal)' : undefined }" /></div>
+            </div>
+          </div>
+        </div>
+        <p v-if="!shownRules.length" class="sub" style="padding: 12px 0">{{ rules.length ? 'Nothing in this filter.' : 'Your admin has not set up milestone badges yet.' }}</p>
+      </div>
+
+      <div class="card" style="padding: 18px; margin-bottom: 16px">
+        <div class="kicker">Special recognition</div>
+        <div v-for="a in awards" :key="a.id" class="row" style="align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--border)">
+          <span style="font-size: 34px">{{ recogById.get(a.badge_id)?.icon }}</span>
+          <div>
+            <b>{{ recogById.get(a.badge_id)?.name }}</b> <span class="sub">· awarded {{ fmtShort(a.awarded_at) }}</span>
+            <div style="font-style: italic; margin-top: 3px">“{{ a.citation }}”</div>
+          </div>
+        </div>
+        <p v-if="!awards.length" class="sub">No recognition badges yet — admins award these for outstanding work.</p>
+      </div>
+
+      <div class="card" style="padding: 18px; margin-bottom: 22px">
+        <div class="kicker">My certificates</div>
+        <p v-if="pdfError" class="hint" style="color: var(--danger)">{{ pdfError }}</p>
+        <div v-for="c in certs" :key="c.id" class="row wrap" style="padding: 9px 0; border-bottom: 1px solid var(--border)">
+          <span style="font-size: 26px">🎓</span>
+          <div style="flex: 1; min-width: 200px">
+            <b>{{ c.course_id ? (courseTitles[c.course_id] ?? 'Course') : 'General certificate' }}</b>
+            <div class="sub">{{ c.number }} · {{ Number(c.credit_hours) }} credit hours · {{ fmtShort(c.issued_at) }}</div>
+            <div v-if="c.citation" class="sub" style="font-style: italic">{{ c.citation }}</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" @click="previewCert(c)">Preview</button>
+          <button class="btn btn-primary btn-sm" @click="downloadCert(c)">⬇ Download PDF</button>
+        </div>
+        <p v-if="!certs.length" class="sub">No certificates issued to you yet.</p>
+      </div>
+
+      <h3 style="margin: 4px 0 6px; font-size: 18px">Milestone quiz badges</h3>
+      <p class="sub" style="margin-bottom: 10px">Hover over a badge, or tab to it with the keyboard, to see how it works.</p>
+
       <div class="how">
         <div><b>1 · Learn</b>Watch each lesson in the block to the end. Videos cannot be skipped.</div>
         <div><b>2 · Pass the quiz</b>Each block ends with a milestone quiz. Score {{ passPct }}% or more to earn the badge.</div>
@@ -113,10 +279,14 @@ const lessonScope = computed(() => (current.value.tier.m === 'final' ? 'every le
 
       <div class="sub" style="margin-bottom: 10px"><b>{{ earnedCount }}</b> of {{ TIERS.length }} badges earned</div>
       <div class="badge-grid">
-        <button v-for="t in TIERS" :key="t.m" class="card badge-tile pick" :class="{ locked: !info(t)?.earned, sel: selected === t.m }" @click="selected = t.m">
+        <button v-for="t in TIERS" :key="t.m" class="card badge-tile pick" :class="{ locked: !info(t)?.earned, sel: selected === t.m }" :aria-describedby="`tt-${t.m}`" @click="selected = t.m">
           <div class="badge-medal">{{ t.icon }}</div>
           <div class="bname">{{ t.name }}</div>
           <div class="sub">{{ info(t)?.earned ? '✓ Earned' : '🔒 Locked' }}</div>
+          <span :id="`tt-${t.m}`" class="tt" role="tooltip">
+            <b>{{ tip(t).title }}</b>
+            <span v-for="(l, i) in tip(t).lines" :key="i">{{ l }}</span>
+          </span>
         </button>
       </div>
 
@@ -228,10 +398,73 @@ const lessonScope = computed(() => (current.value.tier.m === 'final' ? 'every le
         </div>
       </div>
     </template>
+    <CertificatePreview v-if="preview" :url="preview.url" :filename="preview.filename" :title="preview.title" @close="preview = null" />
   </div>
 </template>
 
 <style scoped>
+.grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 16px;
+}
+@media (max-width: 640px) {
+  .grid3 {
+    grid-template-columns: 1fr;
+  }
+}
+.ach-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+.ach {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+}
+.ach-ic {
+  font-size: 30px;
+}
+.ach.off .ach-ic {
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+.pick {
+  position: relative;
+}
+.tt {
+  display: none;
+  position: absolute;
+  z-index: 30;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  width: 230px;
+  background: #101a33;
+  color: #fff;
+  border-radius: 12px;
+  padding: 11px 13px;
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 500;
+  text-align: left;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+}
+.tt b,
+.tt span {
+  display: block;
+}
+.tt b {
+  margin-bottom: 4px;
+}
+.pick:hover .tt,
+.pick:focus-visible .tt,
+.pick:focus .tt {
+  display: block;
+}
 .how {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
