@@ -130,6 +130,11 @@ const router = createRouter({
           component: () => import('@/views/admin/LeaderboardView.vue'),
         },
         {
+          path: 'monitoring',
+          name: 'admin-monitoring',
+          component: () => import('@/views/admin/MonitoringView.vue'),
+        },
+        {
           path: 'email-log',
           name: 'admin-email-log',
           component: () => import('@/views/admin/EmailLogView.vue'),
