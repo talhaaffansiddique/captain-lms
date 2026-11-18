@@ -8,6 +8,12 @@ export interface ReleaseNote {
 // Newest first. Add a new entry here whenever APP_VERSION is bumped in version.ts.
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'v4.5.1',
+    date: '2026-11-18',
+    title: 'Email looks right in dark mode',
+    changes: ['The email keeps its Captain colours (white logo panel, black and red banner, red button) in dark-mode mail apps instead of being inverted.'],
+  },
+  {
     version: 'v4.5',
     date: '2026-11-18',
     title: 'Branded emails and an admin email log',
