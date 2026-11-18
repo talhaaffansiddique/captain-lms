@@ -115,6 +115,11 @@ const router = createRouter({
           component: () => import('@/views/admin/DashboardSettingsView.vue'),
         },
         {
+          path: 'email-log',
+          name: 'admin-email-log',
+          component: () => import('@/views/admin/EmailLogView.vue'),
+        },
+        {
           path: 'release-notes',
           name: 'admin-release-notes',
           component: () => import('@/views/admin/ReleaseNotesView.vue'),

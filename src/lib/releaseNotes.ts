@@ -8,6 +8,17 @@ export interface ReleaseNote {
 // Newest first. Add a new entry here whenever APP_VERSION is bumped in version.ts.
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'v4.5',
+    date: '2026-11-18',
+    title: 'Branded emails and an admin email log',
+    changes: [
+      'New Captain & Company email design: logo, black and red banner, bold heading, red Open Captain LMS button.',
+      'New Admin → Email log page: every email sent, to whom and when, whether it was delivered to the mail server, the exact error if it failed, and whether the person clicked the Open Captain LMS button.',
+      'Send a test email to several addresses at once from the Email log page; each person gets their own separate email.',
+      'One-time setup: run supabase/email-log-v4.5.sql in the Supabase SQL Editor to create the log table.',
+    ],
+  },
+  {
     version: 'v4.4.2',
     date: '2026-11-18',
     title: 'Test email to a chosen address',
