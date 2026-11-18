@@ -18,6 +18,7 @@ import {
 } from '@/lib/analytics'
 import DashWidget from '@/components/DashWidget.vue'
 import FunnelCard from '@/components/FunnelCard.vue'
+import KpiCharts from '@/components/KpiCharts.vue'
 import type { ActivityLogEntry } from '@/lib/database.types'
 
 const auth = useAuthStore()
@@ -136,6 +137,8 @@ async function previewDigest() {
         <h2>Analytics</h2>
       </div>
     </div>
+
+    <div class="kpi-block"><div class="kicker">KPI dashboards</div><KpiCharts /></div>
 
     <p v-if="loading" class="sub">Loading…</p>
     <template v-else-if="data">
@@ -271,6 +274,9 @@ async function previewDigest() {
 </template>
 
 <style scoped>
+.kpi-block {
+  margin-bottom: 26px;
+}
 .stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
