@@ -15,7 +15,18 @@ const today = new Date().toISOString().slice(0, 10)
 
 const csvPreview = ref<ParsedEmployeeRow[]>([])
 const importing = ref(false)
-const importResults = ref<{ email: string; success: boolean; error?: string }[]>([])
+interface InviteResult {
+  row_number: number
+  name: string
+  email: string
+  status: 'sent' | 'failed'
+  error?: string
+  attempts: number
+}
+const importResults = ref<InviteResult[]>([])
+const batchId = ref('')
+const importMessage = ref('')
+const retrying = ref(false)
 
 const departments = ref<Department[]>([])
 const showInactive = ref(false)
@@ -125,32 +136,69 @@ function onCsvSelected(e: Event) {
   })
 }
 
+async function callInviteFunction(payload: Record<string, unknown>) {
+  const { data: sessionData } = await supabase.auth.getSession()
+  const res = await fetch('/.netlify/functions/admin-bulk-invite', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${sessionData.session?.access_token}` },
+    body: JSON.stringify(payload),
+  })
+  const body = await res.json()
+  if (!res.ok) throw new Error(body.error ?? 'Import failed')
+  return body as { results: { row_number: number; email: string; status: 'sent' | 'failed'; error?: string; attempts: number }[]; failedInBatch: number; processed: number; lastRow: number; chunk: number }
+}
+
+/** Sends the CSV rows in small chunks (Resend is rate-limited) and records every row's outcome. */
 async function runImport() {
   if (!csvPreview.value.length) return
   importing.value = true
   importResults.value = []
-  const { data: sessionData } = await supabase.auth.getSession()
-  const token = sessionData.session?.access_token
+  importMessage.value = ''
+  batchId.value = crypto.randomUUID()
+  const rows = csvPreview.value
+  const names = new Map(rows.map((r) => [r.email.trim().toLowerCase(), r.full_name]))
   try {
-    const res = await fetch('/.netlify/functions/admin-invite-employees', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-      body: JSON.stringify({ rows: csvPreview.value }),
-    })
-    const body = await res.json()
-    if (!res.ok) {
-      importResults.value = [{ email: '', success: false, error: body.error ?? 'Import failed' }]
-    } else {
-      importResults.value = body.results
-      const successCount = body.results.filter((r: { success: boolean }) => r.success).length
-      await logActivity(auth.profile?.id, `Bulk-invited ${successCount} of ${csvPreview.value.length} employees via CSV import`)
+    for (let i = 0; i < rows.length; i += 15) {
+      const out = await callInviteFunction({ batch_id: batchId.value, rows: rows.slice(i, i + 15) })
+      for (const r of out.results) importResults.value.push({ ...r, name: names.get(r.email) ?? '' })
+      importMessage.value = `Processed ${Math.min(i + 15, rows.length)} of ${rows.length}…`
     }
-  } catch {
-    importResults.value = [{ email: '', success: false, error: 'Could not reach the invite service.' }]
+    const sent = importResults.value.filter((r) => r.status === 'sent').length
+    importMessage.value = `${sent} of ${rows.length} invitations sent.`
+    await logActivity(auth.profile?.id, `Bulk-invited ${sent} of ${rows.length} employees via CSV import`)
+    await loadEmployees()
+  } catch (e) {
+    importMessage.value = e instanceof Error ? e.message : 'Could not reach the invite service.'
   }
   csvPreview.value = []
   importing.value = false
 }
+
+/** Retries only the rows that failed — sent rows are skipped and no employee is created twice. */
+async function retryFailed() {
+  if (!batchId.value) return
+  retrying.value = true
+  importMessage.value = ''
+  try {
+    let after = 0
+    for (;;) {
+      const out = await callInviteFunction({ batch_id: batchId.value, retry: true, after_row: after })
+      for (const r of out.results) {
+        const row = importResults.value.find((x) => x.row_number === r.row_number)
+        if (row) Object.assign(row, { status: r.status, error: r.error, attempts: r.attempts })
+      }
+      after = out.lastRow
+      if (out.processed < out.chunk) break
+    }
+    const failed = importResults.value.filter((r) => r.status === 'failed').length
+    importMessage.value = failed ? `Retry finished — ${failed} row(s) still failing (see the reason on each row).` : 'Retry finished — every invitation has now been sent.'
+    await loadEmployees()
+  } catch (e) {
+    importMessage.value = e instanceof Error ? e.message : 'Could not reach the invite service.'
+  }
+  retrying.value = false
+}
+const failedCount = computed(() => importResults.value.filter((r) => r.status === 'failed').length)
 </script>
 
 <template>
@@ -187,11 +235,11 @@ async function runImport() {
       </p>
     </div>
 
-    <div class="card" style="padding: 18px; margin-bottom: 20px; max-width: 520px">
+    <div class="card" style="padding: 18px; margin-bottom: 20px; max-width: 900px">
       <div class="panel-title"><h3>Bulk import (CSV)</h3></div>
       <p class="hint" style="margin-bottom: 8px">
-        A CSV with <code>Name, Email, Department</code> columns (header row required). Each row gets a Supabase invite
-        email to set their own password.
+        A CSV with <code>Name, Email, Department</code> columns (header row required). Each row gets an invitation email,
+        sent through Resend, to set their own password. Every row's result is shown below.
       </p>
       <input type="file" accept=".csv,text/csv" @change="onCsvSelected" />
 
@@ -206,10 +254,30 @@ async function runImport() {
         </button>
       </div>
 
+      <p v-if="importMessage" class="hint" style="margin-top: 10px">{{ importMessage }}</p>
       <div v-if="importResults.length" style="margin-top: 12px">
-        <div v-for="(r, i) in importResults" :key="i" style="font-size: 12.5px" :style="{ color: r.success ? 'var(--teal)' : 'var(--danger)' }">
-          {{ r.email || 'Import' }} — {{ r.success ? 'Invited' : r.error }}
+        <div class="row wrap" style="margin-bottom: 8px">
+          <span class="pill pill-teal">{{ importResults.filter((r) => r.status === 'sent').length }} sent</span>
+          <span class="pill" :class="failedCount ? 'pill-danger' : 'pill-outline'">{{ failedCount }} failed</span>
+          <button class="btn btn-sm" :class="failedCount ? 'btn-primary' : 'btn-ghost'" style="margin-left: auto" :disabled="!failedCount || retrying" @click="retryFailed">
+            {{ retrying ? 'Retrying…' : '↻ Retry failed invites' }}
+          </button>
         </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Invitation</th><th>Details</th></tr></thead>
+            <tbody>
+              <tr v-for="r in importResults" :key="r.row_number">
+                <td>{{ r.row_number }}</td>
+                <td>{{ r.name }}</td>
+                <td class="sub">{{ r.email }}</td>
+                <td><span class="pill" :class="r.status === 'sent' ? 'pill-teal' : 'pill-danger'">{{ r.status === 'sent' ? (r.attempts > 1 ? 'Sent (retry)' : 'Sent') : 'Failed' }}</span></td>
+                <td class="sub" :style="{ color: r.status === 'failed' ? 'var(--danger)' : undefined }">{{ r.error ?? '' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="hint" style="margin-top: 6px">Retry only re-sends failed rows. Rows already sent are skipped and no employee record is created twice.</p>
       </div>
     </div>
 
