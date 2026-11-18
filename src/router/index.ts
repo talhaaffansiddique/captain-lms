@@ -115,6 +115,16 @@ const router = createRouter({
           component: () => import('@/views/admin/DashboardSettingsView.vue'),
         },
         {
+          path: 'certificates',
+          name: 'admin-certificates',
+          component: () => import('@/views/admin/CertificatesView.vue'),
+        },
+        {
+          path: 'badges',
+          name: 'admin-badges',
+          component: () => import('@/views/admin/BadgesAdminView.vue'),
+        },
+        {
           path: 'email-log',
           name: 'admin-email-log',
           component: () => import('@/views/admin/EmailLogView.vue'),

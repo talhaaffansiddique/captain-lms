@@ -23,6 +23,8 @@ const links = [
   { to: '/admin/courses', label: 'Courses', short: 'Courses', icon: '🎓' },
   { to: '/admin/modules', label: 'Modules (lessons)', short: 'Lessons', icon: '▤' },
   { to: '/admin/audiences', label: 'Audiences', short: 'Audiences', icon: '🏷️' },
+  { to: '/admin/certificates', label: 'Certificates', short: 'Certs', icon: '📜' },
+  { to: '/admin/badges', label: 'Badges & milestones', short: 'Badges', icon: '🏅' },
   { to: '/admin/dashboard-settings', label: 'Dashboard settings', short: 'Widgets', icon: '⚙' },
   { to: '/admin/email-log', label: 'Email log', short: 'Emails', icon: '✉️' },
   { to: '/admin/release-notes', label: 'Release notes', short: 'Releases', icon: '📝' },
