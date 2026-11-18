@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import type { Module } from '@/lib/database.types'
 
 export interface Assignment {
   id: number
@@ -53,4 +54,21 @@ export function dueLabel(due: string | null): string {
   if (d < 0) return `Overdue · was due ${when}`
   if (d === 0) return 'Due today'
   return `Due ${when}`
+}
+
+/** The signed-in learner's own assignments (empty if v5.sql has not been run). */
+export async function loadMyAssignments(userId: string): Promise<Assignment[]> {
+  return (await loadAssignments({ userId })).rows
+}
+
+/**
+ * Every lesson this learner may open: General + their department + the lessons of any course
+ * explicitly assigned to them, even from another department.
+ */
+export async function loadMyModules(userId: string, dept: string): Promise<{ modules: Module[]; assignments: Assignment[] }> {
+  const assignments = await loadMyAssignments(userId)
+  const ids = [...new Set(assignments.map((a) => a.course_id))]
+  const scope = `department.eq.General,department.eq.${dept}` + (ids.length ? `,course_id.in.(${ids.join(',')})` : '')
+  const { data } = await supabase.from('modules').select('*').or(scope).order('id')
+  return { modules: (data ?? []) as Module[], assignments }
 }
