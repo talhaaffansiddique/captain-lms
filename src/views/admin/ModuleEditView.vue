@@ -6,7 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import { logActivity } from '@/lib/activity'
 import { loadDepartments } from '@/lib/departments'
 import { parseYoutubeId } from '@/lib/youtube'
-import { uploadModuleMaterial, documentEmbedUrl, deleteMaterialFile } from '@/lib/materials'
+import { uploadModuleMaterial, documentEmbedUrl, deleteMaterialFile, isVideoFile } from '@/lib/materials'
 import { MIN_QUESTIONS_TO_PUBLISH, parseBulkQuestions } from '@/lib/quiz'
 import { generateQuestions, type GeneratedQuestion } from '@/lib/generateQuestions'
 import type { Module, QuizQuestion, Department, Course } from '@/lib/database.types'
@@ -369,7 +369,9 @@ async function saveSchedule() {
       <!-- Documents get a viewport-scaled box instead of a fixed 16:9 one — a PPTX/PDF page reads
            poorly letterboxed into a small video-shaped rectangle, especially on a large screen. -->
       <div v-else-if="module_.document_url && module_.document_type" class="document-box">
+        <video v-if="isVideoFile(module_.document_type)" :src="module_.document_url" controls preload="metadata" style="width: 100%; height: 100%; background: #000" />
         <iframe
+          v-else
           :src="documentEmbedUrl(module_.document_url, module_.document_type)"
           style="width: 100%; height: 100%; border: 0"
         />
@@ -378,16 +380,17 @@ async function saveSchedule() {
     </div>
 
     <div class="card" style="padding: 18px; margin-bottom: 20px; max-width: 420px">
-      <div class="panel-title"><h3>Document (alternative to a video)</h3></div>
+      <div class="panel-title"><h3>Upload a file (document or video)</h3></div>
       <p class="hint" style="margin-bottom: 8px">
-        Upload a PDF, PPTX, or DOCX instead of a video — it shows in the same space, above. Uploading one clears any
-        YouTube ID, and vice versa; a module can only have one or the other.
+        Upload a PDF, PPTX or DOCX — or a video file (MP4, MOV, WEBM, up to 50 MB) straight from your computer instead of
+        using YouTube. It shows in the same space, above. Uploading one clears any YouTube ID, and vice versa; a lesson can
+        only have one or the other.
       </p>
-      <input type="file" accept=".pdf,.pptx,.ppt,.docx,.doc" :disabled="uploadingMaterial" @change="onMaterialSelected" />
+      <input type="file" accept=".pdf,.pptx,.ppt,.docx,.doc,.mp4,.mov,.webm,.m4v,video/*" :disabled="uploadingMaterial" @change="onMaterialSelected" />
       <p v-if="uploadingMaterial" class="hint" style="margin-top: 6px">Uploading…</p>
       <p v-if="materialError" class="hint" style="color: var(--danger); margin-top: 6px">{{ materialError }}</p>
       <div v-if="module_.document_url" style="margin-top: 8px; display: flex; align-items: center; gap: 8px">
-        <span class="pill pill-outline">{{ module_.document_type?.toUpperCase() }} attached</span>
+        <span class="pill pill-outline">{{ module_.document_type?.toUpperCase() }} {{ isVideoFile(module_.document_type) ? 'video' : '' }} attached</span>
         <button class="btn btn-ghost btn-sm" @click="removeMaterial">Remove</button>
       </div>
       <p v-if="module_.document_type === 'pptx' || module_.document_type === 'ppt' || module_.document_type === 'docx' || module_.document_type === 'doc'" class="hint" style="margin-top: 6px">

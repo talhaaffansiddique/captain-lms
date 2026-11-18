@@ -116,6 +116,13 @@ async function materialParts(
     return [{ file_data: { file_uri: `https://www.youtube.com/watch?v=${id}` } }]
   }
 
+  if (mod.document_url && mod.document_type && ['mp4', 'mov', 'webm', 'm4v'].includes(mod.document_type)) {
+    throw new UserFacingError(
+      "Uploaded video files can't be read automatically. Paste the video's transcript below and try again.",
+      'need_transcript',
+    )
+  }
+
   if (mod.document_url && mod.document_type) {
     const res = await fetch(mod.document_url)
     if (!res.ok) throw new UserFacingError('Could not download the uploaded file.', 'fetch_failed', 502)

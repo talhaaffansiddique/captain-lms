@@ -6,7 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import { loadTrackData, reachedMilestones, hasPassed, milestoneLabel } from '@/lib/quiz'
 import { notifyQuizUnlocked } from '@/lib/notifications'
 import { loadYouTubeIframeApi, type YTPlayer } from '@/lib/youtube'
-import { documentEmbedUrl } from '@/lib/materials'
+import { documentEmbedUrl, isVideoFile } from '@/lib/materials'
 import { loadMyModules } from '@/lib/assignments'
 import { loadCourses, courseProgress, type CourseVM } from '@/lib/courses'
 import PracticeQuiz from '@/components/PracticeQuiz.vue'
@@ -316,7 +316,16 @@ watch([ccOn, ccLang], applyCaptions)
             letterboxed rectangle on a large monitor.
           -->
           <div v-else-if="hasDocument" class="document-box">
+            <video
+              v-if="isVideoFile(module_.document_type)"
+              :src="module_.document_url as string"
+              controls
+              controlsList="nodownload"
+              preload="metadata"
+              style="width: 100%; height: 100%; background: #000"
+            />
             <iframe
+              v-else
               :src="documentEmbedUrl(module_.document_url as string, module_.document_type as string)"
               style="width: 100%; height: 100%; border: 0"
             />
