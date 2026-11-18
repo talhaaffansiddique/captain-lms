@@ -11,7 +11,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 type Action = 'create' | 'update' | 'deactivate' | 'reactivate' | 'delete' | 'get'
-const ROLES = ['employee', 'manager', 'admin']
+const ROLES = ['employee', 'manager', 'admin', 'hr']
 const BAN_FOREVER = '876000h' // ~100 years
 
 interface Body {

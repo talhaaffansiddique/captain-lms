@@ -2,7 +2,7 @@
 // Once your Supabase project is live, regenerate this file with the real thing:
 //   npx supabase gen types typescript --project-id <your-project-ref> > src/lib/database.types.ts
 
-export type Role = 'employee' | 'admin' | 'manager'
+export type Role = 'employee' | 'admin' | 'manager' | 'hr'
 
 export interface Profile {
   id: string
@@ -108,6 +108,7 @@ export interface ActivityLogEntry {
 export interface Department {
   id: number
   name: string
+  color?: string | null
   created_at: string
 }
 
