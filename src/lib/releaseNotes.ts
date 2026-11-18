@@ -8,6 +8,15 @@ export interface ReleaseNote {
 // Newest first. Add a new entry here whenever APP_VERSION is bumped in version.ts.
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'v4.4.1',
+    date: '2026-11-18',
+    title: 'Email setup check',
+    changes: [
+      'Added a server-side email sender that uses the company mailbox over SMTP (settings are kept in Netlify environment variables).',
+      'Added an admin-only test function that sends one test email to the signed-in admin, to confirm the mailbox settings work.',
+    ],
+  },
+  {
     version: 'v4.4',
     date: '2026-11-06',
     title: 'Certificates & badges info screen',

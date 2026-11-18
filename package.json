@@ -16,6 +16,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",
     "jszip": "^3.10.2",
+    "nodemailer": "^10.6.0",
     "pinia": "^4.0.2",
     "vue": "^3.5.40",
     "vue-router": "^5.2.0"
@@ -24,6 +25,7 @@
     "@netlify/functions": "^6.0.0",
     "@tsconfig/node24": "^24.0.4",
     "@types/node": "^24.13.3",
+    "@types/nodemailer": "^8.0.2",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vue/eslint-config-typescript": "^14.9.0",
     "@vue/tsconfig": "^0.9.1",
