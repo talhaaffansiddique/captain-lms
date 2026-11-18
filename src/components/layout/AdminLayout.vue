@@ -25,6 +25,7 @@ const links = [
   { to: '/admin/audiences', label: 'Audiences', short: 'Audiences', icon: '🏷️' },
   { to: '/admin/certificates', label: 'Certificates', short: 'Certs', icon: '📜' },
   { to: '/admin/badges', label: 'Badges & milestones', short: 'Badges', icon: '🏅' },
+  { to: '/admin/leaderboard', label: 'Leaderboard', short: 'Board', icon: '🏆' },
   { to: '/admin/dashboard-settings', label: 'Dashboard settings', short: 'Widgets', icon: '⚙' },
   { to: '/admin/email-log', label: 'Email log', short: 'Emails', icon: '✉️' },
   { to: '/admin/release-notes', label: 'Release notes', short: 'Releases', icon: '📝' },

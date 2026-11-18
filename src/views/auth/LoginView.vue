@@ -32,6 +32,7 @@ async function submit() {
       await auth.signIn(email.value, password.value)
       if (auth.role === 'admin') router.push('/admin')
       else if (auth.role === 'manager') router.push('/manager')
+      else if (auth.role === 'hr') router.push('/hr')
       else router.push('/app')
     } else {
       await auth.signUp(email.value, password.value, fullName.value, department.value)

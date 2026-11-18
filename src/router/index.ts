@@ -125,6 +125,11 @@ const router = createRouter({
           component: () => import('@/views/admin/BadgesAdminView.vue'),
         },
         {
+          path: 'leaderboard',
+          name: 'admin-leaderboard',
+          component: () => import('@/views/admin/LeaderboardView.vue'),
+        },
+        {
           path: 'email-log',
           name: 'admin-email-log',
           component: () => import('@/views/admin/EmailLogView.vue'),
@@ -168,6 +173,22 @@ const router = createRouter({
           name: 'manager-team',
           component: () => import('@/views/manager/TeamView.vue'),
         },
+        {
+          path: 'leaderboard',
+          name: 'manager-leaderboard',
+          component: () => import('@/views/manager/LeaderboardView.vue'),
+        },
+      ],
+    },
+    {
+      path: '/hr',
+      component: () => import('@/components/layout/HrLayout.vue'),
+      meta: { roles: ['hr', 'admin'] },
+      children: [
+        { path: '', redirect: '/hr/overview' },
+        { path: 'overview', name: 'hr-overview', component: () => import('@/views/hr/OverviewView.vue') },
+        { path: 'compliance', name: 'hr-compliance', component: () => import('@/views/hr/ComplianceView.vue') },
+        { path: 'leaderboard', name: 'hr-leaderboard', component: () => import('@/views/hr/LeaderboardView.vue') },
       ],
     },
   ],
@@ -182,10 +203,12 @@ router.beforeEach(async (to) => {
   if (!auth.isLoggedIn) return { name: 'login' }
 
   const requiredRole = to.meta.role as string | undefined
-  if (requiredRole && auth.role !== requiredRole) {
+  const allowedRoles = (to.meta.roles as string[] | undefined) ?? (requiredRole ? [requiredRole] : undefined)
+  if (allowedRoles && !allowedRoles.includes(auth.role ?? '')) {
     // Signed in, but this route belongs to a different role — send them home for their own role.
     if (auth.role === 'admin') return '/admin'
     if (auth.role === 'manager') return '/manager'
+    if (auth.role === 'hr') return '/hr'
     return '/app'
   }
   // A page whose widget an admin has hidden is no longer reachable, even by typing its address.
@@ -193,7 +216,7 @@ router.beforeEach(async (to) => {
   if (widgetId) {
     const widgets = useWidgetsStore()
     if (!widgets.loaded) await widgets.load()
-    if (!widgets.isVisible(widgetId)) return auth.role === 'manager' ? '/manager' : auth.role === 'admin' ? '/admin' : '/app'
+    if (!widgets.isVisible(widgetId)) return auth.role === 'manager' ? '/manager' : auth.role === 'admin' ? '/admin' : auth.role === 'hr' ? '/hr' : '/app'
   }
   return true
 })

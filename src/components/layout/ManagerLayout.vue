@@ -21,6 +21,7 @@ const allLinks = [
   { to: '/manager/overview', label: 'Team progress', short: 'Progress', icon: '▦' },
   { to: '/manager/heatmap', label: 'Team heatmap', short: 'Heatmap', icon: '🔥', widget: 'mgr.heatmap' },
   { to: '/manager/team', label: 'My Team', short: 'Team', icon: '👥' },
+  { to: '/manager/leaderboard', label: 'Leaderboard', short: 'Board', icon: '🏆' },
 ]
 const links = computed(() => allLinks.filter((l) => !('widget' in l) || widgets.isVisible(l.widget as string)))
 </script>
