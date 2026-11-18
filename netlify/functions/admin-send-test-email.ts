@@ -30,7 +30,15 @@ export default async (req: Request) => {
     return json({ error: `Email is not configured. Missing: ${missing.join(', ')}` }, 500)
   }
 
-  const to = userData.user.email
+  // Defaults to the admin's own address; an admin may name another single address for the test.
+  let requested: string | undefined
+  try {
+    requested = ((await req.json()) as { to?: string }).to?.trim()
+  } catch {
+    requested = undefined
+  }
+  if (requested && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(requested)) return json({ error: 'That is not a valid email address.' }, 400)
+  const to = requested || userData.user.email
   if (!to) return json({ error: 'Your account has no email address.' }, 400)
 
   try {

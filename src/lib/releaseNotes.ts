@@ -8,6 +8,12 @@ export interface ReleaseNote {
 // Newest first. Add a new entry here whenever APP_VERSION is bumped in version.ts.
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'v4.4.2',
+    date: '2026-11-18',
+    title: 'Test email to a chosen address',
+    changes: ['The admin test-email function can now send the test message to a single address the admin names, instead of only their own.'],
+  },
+  {
     version: 'v4.4.1',
     date: '2026-11-18',
     title: 'Email setup check',
